@@ -387,6 +387,33 @@ service cloud.firestore {
         request.resource.data.recipientIds == resource.data.recipientIds;
     }
 
+    match /academic_posts/{postId} {
+      allow read: if signedIn();
+      allow create: if signedIn() &&
+        request.resource.data.authorId == request.auth.uid &&
+        request.resource.data.postType in ['assignment', 'lecture'] &&
+        request.resource.data.title is string &&
+        request.resource.data.title.size() <= 250 &&
+        request.resource.data.caption is string &&
+        request.resource.data.attachments is list &&
+        request.resource.data.attachments.size() <= 10 &&
+        request.resource.data.targetLevels is list &&
+        request.resource.data.targetPrograms is list &&
+        request.resource.data.targetCourses is list;
+      allow update: if signedIn() &&
+        (
+          resource.data.authorId == request.auth.uid ||
+          isAdmin()
+        ) &&
+        request.resource.data.authorId == resource.data.authorId &&
+        request.resource.data.postType == resource.data.postType;
+      allow delete: if signedIn() &&
+        (
+          resource.data.authorId == request.auth.uid ||
+          isAdmin()
+        );
+    }
+
     match /streaks/{streakId} {
       allow read: if signedIn();
       allow create: if signedIn() &&
