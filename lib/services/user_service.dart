@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -29,7 +30,7 @@ class UserService {
   }
 
   // Get user by ID
-  Future<Map<String, dynamic>?> getUserById(String odbc) async {
+  Future<Map<String, dynamic>?> getUserById(String userId) async {
     try {
       final doc = await _firestore.collection('users').doc(userId).get();
       return doc.data();
@@ -41,30 +42,62 @@ class UserService {
 
   // Upload profile picture
   Future<String?> uploadProfilePicture(File imageFile) async {
+    return uploadProfilePictureBytes(
+      await imageFile.readAsBytes(),
+      contentType: 'image/jpeg',
+    );
+  }
+
+  Future<String?> uploadProfilePictureBytes(
+    Uint8List bytes, {
+    String contentType = 'image/jpeg',
+  }) async {
     if (currentUserId.isEmpty) return null;
 
     try {
+      if (bytes.isEmpty) return null;
+      final userReference = _firestore.collection('users').doc(currentUserId);
+      final existingProfile = await userReference.get();
+      final previousStoragePath =
+          existingProfile.data()?['photoStoragePath']?.toString();
+
       // Create unique filename
-      final fileName = 'profile_${currentUserId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final ref = _storage.ref().child('profile_pictures/$fileName');
+      final fileName =
+          'profile_${currentUserId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final ref =
+          _storage.ref().child('profile_pictures/$currentUserId/$fileName');
 
       // Upload file
-      final uploadTask = await ref.putFile(
-        imageFile,
-        SettableMetadata(contentType: 'image/jpeg'),
+      final uploadTask = await ref.putData(
+        bytes,
+        SettableMetadata(
+          contentType: contentType,
+          customMetadata: {'ownerUid': currentUserId},
+        ),
       );
 
       // Get download URL
       final downloadUrl = await uploadTask.ref.getDownloadURL();
 
       // Update user document with new photo URL
-      await _firestore.collection('users').doc(currentUserId).update({
+      await userReference.update({
         'photoUrl': downloadUrl,
+        'photoStoragePath': uploadTask.ref.fullPath,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
       // Also update Firebase Auth profile
       await _auth.currentUser?.updatePhotoURL(downloadUrl);
+
+      if (previousStoragePath != null &&
+          previousStoragePath.isNotEmpty &&
+          previousStoragePath != uploadTask.ref.fullPath) {
+        try {
+          await _storage.ref().child(previousStoragePath).delete();
+        } on FirebaseException catch (error) {
+          if (error.code != 'object-not-found') rethrow;
+        }
+      }
 
       return downloadUrl;
     } catch (e) {
@@ -95,11 +128,23 @@ class UserService {
     if (currentUserId.isEmpty) return false;
 
     try {
-      await _firestore.collection('users').doc(currentUserId).update({
+      final userReference = _firestore.collection('users').doc(currentUserId);
+      final existingProfile = await userReference.get();
+      final storagePath =
+          existingProfile.data()?['photoStoragePath']?.toString();
+      await userReference.update({
         'photoUrl': null,
+        'photoStoragePath': null,
         'updatedAt': FieldValue.serverTimestamp(),
       });
       await _auth.currentUser?.updatePhotoURL(null);
+      if (storagePath != null && storagePath.isNotEmpty) {
+        try {
+          await _storage.ref().child(storagePath).delete();
+        } on FirebaseException catch (error) {
+          if (error.code != 'object-not-found') rethrow;
+        }
+      }
       return true;
     } catch (e) {
       print('Error removing profile picture: $e');
@@ -129,7 +174,7 @@ class UserService {
       if (level != null) updates['level'] = level;
 
       await _firestore.collection('users').doc(currentUserId).update(updates);
-      
+
       if (fullName != null) {
         await _auth.currentUser?.updateDisplayName(fullName);
       }
@@ -155,7 +200,9 @@ class UserService {
           .where('fullName', isLessThanOrEqualTo: '$query\uf8ff')
           .get();
 
-      return snapshot.docs.map((doc) => {...doc.data(), 'uid': doc.id}).toList();
+      return snapshot.docs
+          .map((doc) => {...doc.data(), 'uid': doc.id})
+          .toList();
     } catch (e) {
       print('Error searching users: $e');
       return [];
@@ -164,10 +211,11 @@ class UserService {
 
   // Create or update user document on sign up/login
   Future<void> createOrUpdateUser({
-    required String odbc,
+    required String userId,
     required String email,
     String? fullName,
     String? photoUrl,
+    String? session,
   }) async {
     try {
       final userDoc = _firestore.collection('users').doc(userId);
@@ -178,8 +226,14 @@ class UserService {
         await userDoc.set({
           'uid': userId,
           'email': email,
+          'displayName': fullName ?? email.split('@')[0],
           'fullName': fullName ?? email.split('@')[0],
           'photoUrl': photoUrl,
+          'role': 'student',
+          'isOfficial': false,
+          'officialAccountId': null,
+          'chatIdentity': userId,
+          if (session != null) 'session': session,
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
           'isOnline': true,
@@ -187,10 +241,12 @@ class UserService {
         });
       } else {
         // Update existing user
-        await userDoc.update({
+        final updates = <String, dynamic>{
           'isOnline': true,
           'lastSeen': FieldValue.serverTimestamp(),
-        });
+        };
+        if (session != null) updates['session'] = session;
+        await userDoc.update(updates);
       }
     } catch (e) {
       print('Error creating/updating user: $e');

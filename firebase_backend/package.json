@@ -1,0 +1,14 @@
+{
+  "name": "regent-connect-firebase-admin",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "provision:officer": "node provision_officer.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.4.0"
+  },
+  "devDependencies": {
+    "firebase-tools": "^15.24.0"
+  }
+}

@@ -206,7 +206,7 @@ class AcademicsTab extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: isDark ? const Color(0xFF2D2D2D) : Colors.grey[50],
+      color: isDark ? RegentColors.darkCard : RegentColors.primarySoft,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,

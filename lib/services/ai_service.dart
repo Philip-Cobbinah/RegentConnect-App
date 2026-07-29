@@ -1,15 +1,17 @@
 import 'dart:typed_data';
+
 import 'package:google_generative_ai/google_generative_ai.dart';
+
+import '../core/api_keys.dart';
 
 class AIService {
   late GenerativeModel _model;
   late ChatSession _chatSession;
 
   AIService() {
-    // Initialize Gemini API with your API key
     _model = GenerativeModel(
       model: 'gemini-2.0-flash',
-      apiKey: 'AIzaSyB58cacHyqUZU1tjqwkfguFUre_iGtP4qw',
+      apiKey: ApiKeys.geminiApiKey,
       generationConfig: GenerationConfig(
         temperature: 0.7,
         topK: 40,
@@ -17,14 +19,14 @@ class AIService {
         maxOutputTokens: 2048,
       ),
     );
-    
+
     _chatSession = _model.startChat();
   }
 
   Future<String> sendMessage(String message) async {
     try {
-      // Add context to the message for better responses
-      final contextualMessage = '''You are Regent AI, an intelligent academic assistant for Regent University students. 
+      final contextualMessage =
+          '''You are Regent AI, an intelligent academic assistant for Regent University students.
 You have access to real-time information and can provide accurate answers to academic questions.
 
 When answering questions:
@@ -44,18 +46,20 @@ User Question: $message''';
 
       if (response.text != null && response.text!.isNotEmpty) {
         return response.text!;
-      } else {
-        return 'Sorry, I could not process your question. Please try again.';
       }
+      return 'Sorry, I could not process your question. Please try again.';
     } catch (e) {
-      return 'Error: Unable to get response. Please check your API key and internet connection. Error details: $e';
+      return 'Error: Unable to get response. Please check your API key and '
+          'internet connection. Error details: $e';
     }
   }
 
-  // Analyze image with custom user prompt
-  Future<String> analyzeImageWithPrompt(Uint8List imageBytes, String mimeType, String userPrompt) async {
+  Future<String> analyzeImageWithPrompt(
+    Uint8List imageBytes,
+    String mimeType,
+    String userPrompt,
+  ) async {
     try {
-      // If you're using Google's Generative AI or similar
       final prompt = '''
 $userPrompt
 
@@ -66,43 +70,42 @@ If it's text, read and interpret it.
 Be thorough but concise in your explanation.
 ''';
 
-      // Call your existing image analysis with the custom prompt
       return await analyzeImage(imageBytes, mimeType, customPrompt: prompt);
     } catch (e) {
       throw Exception('Failed to analyze image: $e');
     }
   }
 
-  // Update existing analyzeImage method to accept optional custom prompt
-  Future<String> analyzeImage(Uint8List imageBytes, String mimeType, {String? customPrompt}) async {
+  Future<String> analyzeImage(
+    Uint8List imageBytes,
+    String mimeType, {
+    String? customPrompt,
+  }) async {
     try {
+      final prompt = customPrompt ??
+          '''You are Regent AI, an academic assistant. Analyze this image and provide a detailed explanation.
+If it contains a math problem, solve it step by step with clear working.
+If it's a diagram or chart, explain what it shows and provide insights.
+Be educational and helpful in your response.''';
+
       final response = await _chatSession.sendMessage(
         Content.multi([
-          TextPart('''You are Regent AI, an academic assistant. Analyze this image and provide a detailed explanation. 
-If it contains a math problem, solve it step by step with clear working. 
-If it's a diagram or chart, explain what it shows and provide insights.
-Be educational and helpful in your response.'''),
+          TextPart(prompt),
           DataPart(mimeType, imageBytes),
         ]),
       );
 
       if (response.text != null && response.text!.isNotEmpty) {
         return response.text!;
-      } else {
-        return 'Sorry, I could not analyze the image. Please try again.';
       }
+      return 'Sorry, I could not analyze the image. Please try again.';
     } catch (e) {
       return 'Error analyzing image: $e';
     }
   }
 
-  // Transcribe audio and respond
   Future<String> transcribeAudio(Uint8List audioBytes) async {
     try {
-      // If using Google's Generative AI or OpenAI Whisper
-      // For now, return a placeholder message
-      // You can integrate with actual transcription service here
-      
       return '''I received your audio message! 🎤
 
 Unfortunately, audio transcription requires additional setup. Here's what you can do:

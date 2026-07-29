@@ -1,12 +1,15 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:provider/provider.dart';
-import '../../../core/constants.dart';
+import 'package:flutter/material.dart';
+
+import '../../../core/official_accounts.dart';
 import '../../../core/theme.dart';
-import '../../../core/theme_provider.dart';
 import '../../../services/auth_service.dart';
-import '../../../widgets/wave_clipper.dart';
-import '../../calls/screens/call_screen.dart';
+import '../../../services/call_service.dart';
+import '../../../services/chat_service.dart';
+import '../../../widgets/active_call_overlay.dart';
+import '../../calls/screens/video_call_screen.dart';
+import '../../chat/screens/official_account_profile_screen.dart';
+import '../../chat/screens/dm_screen.dart';
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
@@ -16,11 +19,35 @@ class UsersScreen extends StatefulWidget {
 }
 
 class _UsersScreenState extends State<UsersScreen> {
-  final authService = AuthService();
-  final _searchController = TextEditingController();
+  final AuthService _authService = AuthService();
+  final CallService _callService = CallService();
+  final ChatService _chatService = ChatService();
+  final TextEditingController _searchController = TextEditingController();
+
+  final List<String> _filters = const [
+    'All',
+    'Officials',
+    'Online',
+    'My Program',
+  ];
   String _selectedFilter = 'All';
-  final List<String> _filters = ['All', 'Online', 'My Program'];
-  final int _currentNavIndex = 0;
+  String? _currentProgram;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentProgram();
+  }
+
+  Future<void> _loadCurrentProgram() async {
+    final userId = _authService.currentUser?.uid;
+    if (userId == null) return;
+    final document =
+        await FirebaseFirestore.instance.collection('users').doc(userId).get();
+    if (mounted) {
+      setState(() => _currentProgram = document.data()?['program']?.toString());
+    }
+  }
 
   @override
   void dispose() {
@@ -30,474 +57,506 @@ class _UsersScreenState extends State<UsersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
-
-    final gradientColor1 = isDark 
-        ? const Color(0xFF1A1A2E) 
-        : const Color(0xFF4A148C);
-    final gradientColor2 = isDark 
-        ? const Color(0xFF16213E) 
-        : const Color(0xFF7B1FA2);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headerColors = isDark
+        ? const [RegentColors.darkBackground, RegentColors.darkSurface]
+        : const [RegentColors.primaryDark, RegentColors.primary];
 
     return Scaffold(
-      body: Stack(
+      body: Column(
         children: [
-          Column(
-            children: [
-              // Header with gradient
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [gradientColor1, gradientColor2],
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(
+              16,
+              MediaQuery.paddingOf(context).top + 12,
+              16,
+              18,
+            ),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: headerColors,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Find Users',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ],
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                    const SizedBox(height: 16),
-                    // Search Bar
-                    TextField(
-                      controller: _searchController,
-                      onChanged: (_) => setState(() {}),
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        hintText: 'Search by name or program...',
-                        hintStyle: const TextStyle(color: Colors.white70),
-                        prefixIcon: const Icon(Icons.search, color: Colors.white70),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.white30),
+                    const Expanded(
+                      child: Text(
+                        'Find people & offices',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.white30),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.1),
-                        suffixIcon: _searchController.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear, color: Colors.white70),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() {});
-                                },
-                              )
-                            : null,
                       ),
                     ),
                   ],
                 ),
-              ),
-
-              // Filter Chips
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                color: isDark ? const Color(0xFF2D2D2D) : Colors.grey[50],
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: _filters.map((filter) {
-                      final isSelected = _selectedFilter == filter;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: GestureDetector(
-                          onTap: () => setState(() => _selectedFilter = filter),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              gradient: isSelected
-                                  ? LinearGradient(
-                                      colors: [
-                                        const Color(0xFF4A148C),
-                                        const Color(0xFF7B1FA2),
-                                      ],
-                                    )
-                                  : null,
-                              color: isSelected ? null : Colors.grey[300],
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              filter,
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.grey[700],
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              ),
-                            ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _searchController,
+                  onChanged: (_) => setState(() {}),
+                  style: const TextStyle(color: Colors.black87),
+                  cursorColor: RegentColors.darkViolet,
+                  decoration: InputDecoration(
+                    hintText: 'Search name, office, email, or program',
+                    hintStyle: const TextStyle(color: Colors.black54),
+                    prefixIcon:
+                        const Icon(Icons.search, color: RegentColors.violet),
+                    suffixIcon: _searchController.text.isEmpty
+                        ? null
+                        : IconButton(
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {});
+                            },
+                            icon: const Icon(Icons.close),
                           ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-
-              // Users List
-              Expanded(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection(AppConstants.usersCollection)
-                      .where('uid', isNotEqualTo: authService.currentUser?.uid)
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.people_outline,
-                              size: 64,
-                              color: isDark ? Colors.white38 : Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No users found',
-                              style: TextStyle(
-                                color: isDark ? Colors.white60 : Colors.grey,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    final users = snapshot.data!.docs;
-                    final filteredUsers = users.where((doc) {
-                      final user = doc.data() as Map<String, dynamic>;
-                      final name = (user['displayName'] ?? '').toString().toLowerCase();
-                      final program = (user['program'] ?? '').toString().toLowerCase();
-                      final query = _searchController.text.toLowerCase();
-
-                      // Filter by search query
-                      if (query.isNotEmpty &&
-                          !name.contains(query) &&
-                          !program.contains(query)) {
-                        return false;
-                      }
-
-                      // Filter by selected filter
-                      if (_selectedFilter == 'Online' && user['isOnline'] != true) {
-                        return false;
-                      }
-                      if (_selectedFilter == 'My Program' &&
-                          user['program'] != authService.currentUser?.displayName) {
-                        return false;
-                      }
-
-                      return true;
-                    }).toList();
-
-                    if (filteredUsers.isEmpty) {
-                      return Center(
-                        child: Text(
-                          'No users match your search',
-                          style: TextStyle(
-                            color: isDark ? Colors.white60 : Colors.grey,
-                          ),
-                        ),
-                      );
-                    }
-
-                    return ListView.separated(
-                      padding: const EdgeInsets.only(bottom: 100, top: 8),
-                      itemCount: filteredUsers.length,
-                      separatorBuilder: (context, index) =>
-                          Divider(color: isDark ? Colors.white12 : Colors.grey[300]),
-                      itemBuilder: (context, index) {
-                        final user = filteredUsers[index].data() as Map<String, dynamic>;
-                        return _buildUserTile(user, isDark, context);
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-
-          // Bottom Navigation - Always visible
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _buildBottomNavigation(gradientColor1, gradientColor2, isDark),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUserTile(Map<String, dynamic> user, bool isDark, BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      child: ListTile(
-        leading: Stack(
-          children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundImage: user['photoUrl'] != null
-                  ? NetworkImage(user['photoUrl'])
-                  : null,
-              backgroundColor: isDark ? Colors.grey[700] : Colors.grey[300],
-              child: user['photoUrl'] == null
-                  ? Text(
-                      (user['displayName'] ?? 'U')[0].toUpperCase(),
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    )
-                  : null,
-            ),
-            if (user['isOnline'] == true)
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: Colors.green,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                ),
-              ),
-          ],
-        ),
-        title: Text(
-          user['displayName'] ?? 'Unknown',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
-        ),
-        subtitle: Text(
-          '${user['program'] ?? 'N/A'} • Level ${user['level'] ?? 100}',
-          style: TextStyle(color: isDark ? Colors.white60 : Colors.grey, fontSize: 12),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.call, color: RegentColors.blue),
-              iconSize: 20,
-              onPressed: () => _startCall(user, isVideo: false),
-            ),
-            IconButton(
-              icon: const Icon(Icons.videocam, color: RegentColors.blue),
-              iconSize: 20,
-              onPressed: () => _startCall(user, isVideo: true),
-            ),
-          ],
-        ),
-        onTap: () => _showUserProfile(user, context, isDark),
-      ),
-    );
-  }
-
-  void _startCall(Map<String, dynamic> user, {required bool isVideo}) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CallScreen(
-          recipientId: user['uid'],
-          recipientName: user['displayName'] ?? 'Unknown',
-          recipientPhotoUrl: user['photoUrl'],
-          isVideoCall: isVideo,
-        ),
-      ),
-    );
-  }
-
-  void _showUserProfile(Map<String, dynamic> user, BuildContext context, bool isDark) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: CircleAvatar(
-                radius: 40,
-                backgroundImage: user['photoUrl'] != null
-                    ? NetworkImage(user['photoUrl'])
-                    : null,
-                child: user['photoUrl'] == null
-                    ? Text(
-                        (user['displayName'] ?? 'U')[0].toUpperCase(),
-                        style: const TextStyle(fontSize: 32),
-                      )
-                    : null,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Center(
-              child: Text(
-                user['displayName'] ?? 'Unknown',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-            ),
-            Center(
-              child: Text(
-                user['email'] ?? '',
-                style: const TextStyle(color: Colors.grey),
-              ),
-            ),
-            const SizedBox(height: 24),
-            _buildProfileInfo('Program', user['program'] ?? 'N/A'),
-            _buildProfileInfo('Level', 'Level ${user['level'] ?? 100}'),
-            _buildProfileInfo('About', user['about'] ?? 'Hey there! I\'m using Regent Connect'),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _startCall(user, isVideo: false);
-                    },
-                    icon: const Icon(Icons.call),
-                    label: const Text('Call'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: RegentColors.green,
-                      foregroundColor: Colors.white,
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _startCall(user, isVideo: true);
-                    },
-                    icon: const Icon(Icons.videocam),
-                    label: const Text('Video'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: RegentColors.blue,
-                      foregroundColor: Colors.white,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        color: RegentColors.lightViolet,
+                        width: 2,
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
+          ),
+          SizedBox(
+            height: 58,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              children: [
+                for (final filter in _filters)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(filter),
+                      selected: _selectedFilter == filter,
+                      onSelected: (_) {
+                        setState(() => _selectedFilter = filter);
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream:
+                  FirebaseFirestore.instance.collection('users').snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return _emptyState(
+                    Icons.error_outline,
+                    'Directory unavailable',
+                    snapshot.error.toString(),
+                  );
+                }
+
+                final firestoreUsers = (snapshot.data?.docs ?? const [])
+                    .map(
+                      (document) => {
+                        ...(document.data() as Map<String, dynamic>),
+                        'documentId': document.id,
+                        'authUid': document.id,
+                      },
+                    )
+                    .toList();
+                var users = OfficialAccounts.search(
+                  OfficialAccounts.mergeDirectory(firestoreUsers),
+                  _searchController.text,
+                );
+                users = users.where((user) {
+                  final identity =
+                      (user['chatIdentity'] ?? user['uid']).toString();
+                  if (identity == _chatService.currentMessagingId) return false;
+                  if (_selectedFilter == 'Officials') {
+                    return user['isOfficial'] == true;
+                  }
+                  if (_selectedFilter == 'Online') {
+                    return user['isOnline'] == true;
+                  }
+                  if (_selectedFilter == 'My Program') {
+                    return _currentProgram != null &&
+                        user['program']?.toString() == _currentProgram;
+                  }
+                  return true;
+                }).toList();
+
+                users.sort((a, b) {
+                  final officialComparison = (b['isOfficial'] == true ? 1 : 0)
+                      .compareTo(a['isOfficial'] == true ? 1 : 0);
+                  if (officialComparison != 0) return officialComparison;
+                  return _nameOf(a).compareTo(_nameOf(b));
+                });
+
+                if (users.isEmpty) {
+                  return _emptyState(
+                    Icons.people_outline,
+                    'No matches',
+                    'Try a different name, office, email, or filter.',
+                  );
+                }
+
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 24),
+                  itemCount: users.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 3),
+                  itemBuilder: (context, index) =>
+                      _buildUserTile(users[index], isDark),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUserTile(Map<String, dynamic> user, bool isDark) {
+    final name = _nameOf(user);
+    final isOfficial = user['isOfficial'] == true;
+    final photo = user['photoUrl']?.toString();
+    final subtitle = isOfficial
+        ? (user['department'] ?? user['program'] ?? 'Official Regent office')
+            .toString()
+        : [
+            user['program'],
+            user['level'] == null ? null : 'Level ${user['level']}',
+            user['session'],
+          ].where((value) => value != null && value.toString().isNotEmpty).join(
+              ' • ',
+            );
+
+    return Card(
+      child: ListTile(
+        contentPadding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+        leading: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            CircleAvatar(
+              radius: 27,
+              backgroundColor: isOfficial
+                  ? RegentColors.violet
+                  : (isDark ? Colors.grey.shade700 : Colors.grey.shade300),
+              backgroundImage: photo != null && photo.isNotEmpty
+                  ? NetworkImage(photo)
+                  : null,
+              child: photo == null || photo.isEmpty
+                  ? Icon(
+                      isOfficial ? Icons.account_balance : Icons.person,
+                      color: isOfficial ? Colors.white : Colors.grey.shade700,
+                    )
+                  : null,
+            ),
+            if (user['isOnline'] == true)
+              Positioned(
+                right: -1,
+                bottom: -1,
+                child: Container(
+                  width: 13,
+                  height: 13,
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Theme.of(context).cardColor,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
           ],
+        ),
+        title: Row(
+          children: [
+            Flexible(
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            if (isOfficial)
+              const Padding(
+                padding: EdgeInsets.only(left: 5),
+                child: Icon(Icons.verified, color: RegentColors.blue, size: 17),
+              ),
+          ],
+        ),
+        subtitle: Text(
+          subtitle.isEmpty ? (user['email'] ?? '').toString() : subtitle,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: 'Message',
+              icon: const Icon(
+                Icons.chat_bubble_rounded,
+                color: RegentColors.violet,
+              ),
+              onPressed: () => _startChat(user),
+            ),
+            if (!isOfficial) ...[
+              IconButton(
+                tooltip: 'Voice call',
+                icon: const Icon(
+                  Icons.call_rounded,
+                  color: RegentColors.green,
+                ),
+                onPressed: () => _startCall(user, isVideo: false),
+              ),
+              IconButton(
+                tooltip: 'Video call',
+                icon: const Icon(
+                  Icons.videocam_rounded,
+                  color: RegentColors.blue,
+                ),
+                onPressed: () => _startCall(user, isVideo: true),
+              ),
+            ],
+          ],
+        ),
+        onTap: () => _showUserProfile(user),
+      ),
+    );
+  }
+
+  void _startChat(Map<String, dynamic> user) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DMScreen(
+          recipientId: (user['chatIdentity'] ?? user['uid'] ?? user['userId'])
+              .toString(),
+          recipientName: _nameOf(user),
+          recipientPhoto: user['photoUrl']?.toString(),
         ),
       ),
     );
   }
 
-  Widget _buildProfileInfo(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-              fontWeight: FontWeight.bold,
-            ),
+  Future<void> _startCall(
+    Map<String, dynamic> user, {
+    required bool isVideo,
+  }) async {
+    final recipientId =
+        (user['authUid'] ?? user['uid'] ?? user['userId'] ?? '').toString();
+    if (recipientId.isEmpty) return;
+
+    try {
+      final currentUserId = _authService.currentUser?.uid;
+      if (currentUserId == null) {
+        throw const CallException('Sign in before starting a call.');
+      }
+      final currentUser = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUserId)
+          .get();
+      final callerData = currentUser.data();
+      final callerName = callerData?['fullName'] ??
+          callerData?['displayName'] ??
+          callerData?['email'] ??
+          'Regent user';
+      final recipientName = _nameOf(user);
+      final recipientPhoto = user['photoUrl']?.toString();
+      final callId = await _callService.initiateCall(
+        receiverId: recipientId,
+        receiverName: recipientName,
+        callerName: callerName.toString(),
+        isVideo: isVideo,
+        callerPhoto: callerData?['photoUrl']?.toString(),
+        receiverPhoto: recipientPhoto,
+      );
+
+      if (!mounted) return;
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VideoCallScreen(
+            callId: callId,
+            recipientId: recipientId,
+            recipientName: recipientName,
+            recipientPhoto: recipientPhoto,
+            isVideo: isVideo,
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
-    );
+        ),
+      );
+      if (result is Map && result['minimized'] == true) {
+        final callData = result['callData'];
+        if (callData is Map<String, dynamic>) {
+          activeCallOverlayKey.currentState?.setMinimizedCall(callData);
+        }
+      }
+    } on CallException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('The call could not be started.')),
+        );
+      }
+    }
   }
 
-  Widget _buildBottomNavigation(Color color1, Color color2, bool isDark) {
-    return SizedBox(
-      height: 100,
-      child: Stack(
-        children: [
-          CustomPaint(
-            size: Size(MediaQuery.of(context).size.width, 100),
-            painter: WavePainter(
-              color1: color1,
-              color2: color2,
-              isTop: false,
-            ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SafeArea(
-              child: Container(
-                height: 70,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildNavItem(0, Icons.chat_bubble_rounded, 'Chats', color1),
-                    _buildNavItem(1, Icons.call_rounded, 'Calls', color1),
-                    _buildNavItem(2, Icons.donut_large_rounded, 'Status', color1),
-                    _buildNavItem(3, Icons.school_rounded, 'Academics', color1),
-                    _buildNavItem(4, Icons.settings_rounded, 'Settings', color1),
-                  ],
+  void _showUserProfile(Map<String, dynamic> user) {
+    final isOfficial = user['isOfficial'] == true;
+    final name = _nameOf(user);
+
+    if (isOfficial) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OfficialAccountProfileScreen(account: user),
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(
+                radius: 42,
+                backgroundColor:
+                    isOfficial ? RegentColors.violet : Colors.grey.shade300,
+                child: Icon(
+                  isOfficial ? Icons.account_balance : Icons.person,
+                  color: isOfficial ? Colors.white : Colors.grey.shade700,
+                  size: 36,
                 ),
               ),
-            ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      name,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 21,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (isOfficial)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 6),
+                      child: Icon(Icons.verified, color: RegentColors.blue),
+                    ),
+                ],
+              ),
+              Text(
+                (user['email'] ?? '').toString(),
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              if ((user['session'] ?? '').toString().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Session: ${user['session']}',
+                  style: TextStyle(color: Colors.grey.shade600),
+                ),
+              ],
+              const SizedBox(height: 18),
+              if ((user['about'] ?? '').toString().isNotEmpty)
+                Text(
+                  user['about'].toString(),
+                  textAlign: TextAlign.center,
+                ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
+                    _startChat(user);
+                  },
+                  icon: const Icon(Icons.chat_bubble),
+                  label: Text('Message $name'),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label, Color color1) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.pushReplacementNamed(context, '/home');
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 24),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 10,
+  String _nameOf(Map<String, dynamic> user) {
+    return (user['fullName'] ??
+            user['displayName'] ??
+            user['email'] ??
+            'Unknown user')
+        .toString();
+  }
+
+  Widget _emptyState(IconData icon, String title, String subtitle) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 5),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+          ],
+        ),
       ),
     );
   }

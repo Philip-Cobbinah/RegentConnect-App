@@ -1,11 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
+import 'dart:typed_data';
 import '../models/question_model.dart';
 import '../core/constants.dart';
+import '../core/media_utils.dart';
 
 class QuestionsService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
   // Get all past questions
@@ -32,9 +36,8 @@ class QuestionsService {
 
   // Search questions
   Future<List<QuestionModel>> searchQuestions(String query) async {
-    final snapshot = await _firestore
-        .collection(AppConstants.questionsCollection)
-        .get();
+    final snapshot =
+        await _firestore.collection(AppConstants.questionsCollection).get();
 
     return snapshot.docs
         .map((doc) => QuestionModel.fromMap(doc.data()))
@@ -49,9 +52,45 @@ class QuestionsService {
     required File file,
     required QuestionModel question,
   }) async {
+    await uploadQuestionBytes(
+      bytes: await file.readAsBytes(),
+      fileName: file.path.split(RegExp(r'[/\\]')).last,
+      question: question,
+    );
+  }
+
+  Future<void> uploadQuestionBytes({
+    required Uint8List bytes,
+    required String fileName,
+    required QuestionModel question,
+  }) async {
+    final ownerUid = _auth.currentUser?.uid;
+    if (ownerUid == null || ownerUid != question.uploadedBy) {
+      throw Exception('Sign in again before uploading.');
+    }
+    if (bytes.isEmpty) throw Exception('The selected file is empty.');
+
     // Upload file to storage
-    final ref = _storage.ref().child('past_questions/${question.id}.pdf');
-    await ref.putFile(file);
+    final safeName = MediaUtils.sanitizeFileName(
+      fileName,
+      fallback: '${question.id}.pdf',
+    );
+    final storagePath = 'questions/$ownerUid/${question.id}/$safeName';
+    final ref = _storage.ref().child(storagePath);
+    await ref.putData(
+      bytes,
+      SettableMetadata(
+        contentType: MediaUtils.contentTypeForName(
+          fileName,
+          fallback: 'application/pdf',
+        ),
+        customMetadata: {
+          'ownerUid': ownerUid,
+          'questionId': question.id,
+          'originalName': fileName,
+        },
+      ),
+    );
     final fileUrl = await ref.getDownloadURL();
 
     // Save to Firestore
@@ -72,7 +111,11 @@ class QuestionsService {
     await _firestore
         .collection(AppConstants.questionsCollection)
         .doc(question.id)
-        .set(updatedQuestion.toMap());
+        .set({
+      ...updatedQuestion.toMap(),
+      'storagePath': storagePath,
+      'fileName': fileName,
+    });
   }
 
   // Increment download count

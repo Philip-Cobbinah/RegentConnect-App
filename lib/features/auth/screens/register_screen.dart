@@ -12,7 +12,8 @@ class RegisterScreen extends StatefulWidget {
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStateMixin {
+class _RegisterScreenState extends State<RegisterScreen>
+    with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -24,12 +25,18 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   String? _errorMessage;
-  
+
   FacultyData? selectedFaculty;
   ProgramData? selectedProgram;
   int? selectedLevel;
-  
+  String? selectedSession;
+
   final List<int> levels = [100, 200, 300, 400];
+  final List<String> sessions = const [
+    'Morning Session (Regular)',
+    'Evening Session (Regular)',
+    'Weekend Stream',
+  ];
 
   // Animation controllers
   late AnimationController _backgroundController;
@@ -39,7 +46,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
   @override
   void initState() {
     super.initState();
-    
+
     _backgroundController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 20),
@@ -76,9 +83,13 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (selectedFaculty == null || selectedProgram == null || selectedLevel == null) {
+    if (selectedFaculty == null ||
+        selectedProgram == null ||
+        selectedLevel == null ||
+        selectedSession == null) {
       setState(() {
-        _errorMessage = 'Please select your faculty, program, and level';
+        _errorMessage =
+            'Please select your faculty, program, level, and session';
       });
       return;
     }
@@ -89,13 +100,15 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
     });
 
     try {
-      await _authService.registerWithEmailAndPassword(
+      await _authService.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
-        fullName: _fullNameController.text.trim(),
-        faculty: selectedFaculty!.name,
+        displayName: _fullNameController.text.trim(),
         program: selectedProgram!.name,
         level: selectedLevel!,
+        role: 'student',
+        stream: selectedFaculty!.name,
+        session: selectedSession!,
       );
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/home');
@@ -119,7 +132,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
         children: [
           // Animated background
           _buildAnimatedBackground(),
-          
+
           // Gradient overlay
           Container(
             decoration: BoxDecoration(
@@ -155,24 +168,29 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
-                                  colors: [RegentColors.violet, RegentColors.darkViolet],
+                                  colors: [
+                                    RegentColors.violet,
+                                    RegentColors.darkViolet
+                                  ],
                                 ),
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
                                     color: RegentColors.violet.withOpacity(0.4),
-                                    blurRadius: 20 + (_pulseController.value * 10),
+                                    blurRadius:
+                                        20 + (_pulseController.value * 10),
                                     spreadRadius: 5,
                                   ),
                                 ],
                               ),
-                              child: const Icon(Icons.person_add, size: 48, color: Colors.white),
+                              child: const Icon(Icons.person_add,
+                                  size: 48, color: Colors.white),
                             ),
                           );
                         },
                       ),
                       const SizedBox(height: 20),
-                      
+
                       ShaderMask(
                         shaderCallback: (bounds) => const LinearGradient(
                           colors: [Colors.white, RegentColors.lightViolet],
@@ -189,7 +207,8 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                       const SizedBox(height: 8),
                       Text(
                         'Join Regent Connect',
-                        style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.7)),
+                        style: TextStyle(
+                            fontSize: 14, color: Colors.white.withOpacity(0.7)),
                       ),
                       const SizedBox(height: 30),
 
@@ -201,13 +220,18 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                           decoration: BoxDecoration(
                             color: Colors.red.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.red.withOpacity(0.5)),
+                            border:
+                                Border.all(color: Colors.red.withOpacity(0.5)),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.error_outline, color: Colors.red),
+                              const Icon(Icons.error_outline,
+                                  color: Colors.red),
                               const SizedBox(width: 12),
-                              Expanded(child: Text(_errorMessage!, style: const TextStyle(color: Colors.red))),
+                              Expanded(
+                                  child: Text(_errorMessage!,
+                                      style:
+                                          const TextStyle(color: Colors.red))),
                             ],
                           ),
                         ),
@@ -218,7 +242,8 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                         label: 'Full Name',
                         icon: Icons.person_outlined,
                         validator: (value) {
-                          if (value == null || value.isEmpty) return 'Please enter your full name';
+                          if (value == null || value.isEmpty)
+                            return 'Please enter your full name';
                           return null;
                         },
                       ),
@@ -231,8 +256,10 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                         icon: Icons.email_outlined,
                         keyboardType: TextInputType.emailAddress,
                         validator: (value) {
-                          if (value == null || value.isEmpty) return 'Please enter your email';
-                          if (!value.contains('@')) return 'Please enter a valid email';
+                          if (value == null || value.isEmpty)
+                            return 'Please enter your email';
+                          if (!value.contains('@'))
+                            return 'Please enter a valid email';
                           return null;
                         },
                       ),
@@ -243,10 +270,13 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                         label: 'Faculty',
                         icon: Icons.school_outlined,
                         value: selectedFaculty,
-                        items: universityFaculties.map((f) => DropdownMenuItem(
-                          value: f,
-                          child: Text(f.name, overflow: TextOverflow.ellipsis),
-                        )).toList(),
+                        items: universityFaculties
+                            .map((f) => DropdownMenuItem(
+                                  value: f,
+                                  child: Text(f.name,
+                                      overflow: TextOverflow.ellipsis),
+                                ))
+                            .toList(),
                         onChanged: (value) {
                           setState(() {
                             selectedFaculty = value;
@@ -262,11 +292,15 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                           label: 'Program',
                           icon: Icons.book_outlined,
                           value: selectedProgram,
-                          items: selectedFaculty!.programs.map((p) => DropdownMenuItem(
-                            value: p,
-                            child: Text(p.name, overflow: TextOverflow.ellipsis),
-                          )).toList(),
-                          onChanged: (value) => setState(() => selectedProgram = value),
+                          items: selectedFaculty!.programs
+                              .map((p) => DropdownMenuItem(
+                                    value: p,
+                                    child: Text(p.name,
+                                        overflow: TextOverflow.ellipsis),
+                                  ))
+                              .toList(),
+                          onChanged: (value) =>
+                              setState(() => selectedProgram = value),
                         ),
                       if (selectedFaculty != null) const SizedBox(height: 16),
 
@@ -275,11 +309,33 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                         label: 'Level',
                         icon: Icons.stairs_outlined,
                         value: selectedLevel,
-                        items: levels.map((l) => DropdownMenuItem(
-                          value: l,
-                          child: Text('Level $l'),
-                        )).toList(),
-                        onChanged: (value) => setState(() => selectedLevel = value),
+                        items: levels
+                            .map((l) => DropdownMenuItem(
+                                  value: l,
+                                  child: Text('Level $l'),
+                                ))
+                            .toList(),
+                        onChanged: (value) =>
+                            setState(() => selectedLevel = value),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Study session dropdown
+                      _buildDropdown<String>(
+                        label: 'Study Session',
+                        icon: Icons.schedule_outlined,
+                        value: selectedSession,
+                        items: sessions
+                            .map((session) => DropdownMenuItem(
+                                  value: session,
+                                  child: Text(
+                                    session,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ))
+                            .toList(),
+                        onChanged: (value) =>
+                            setState(() => selectedSession = value),
                       ),
                       const SizedBox(height: 16),
 
@@ -291,14 +347,19 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                         obscureText: _obscurePassword,
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                             color: RegentColors.violet,
                           ),
-                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword),
                         ),
                         validator: (value) {
-                          if (value == null || value.isEmpty) return 'Please enter a password';
-                          if (value.length < 6) return 'Password must be at least 6 characters';
+                          if (value == null || value.isEmpty)
+                            return 'Please enter a password';
+                          if (value.length < 6)
+                            return 'Password must be at least 6 characters';
                           return null;
                         },
                       ),
@@ -312,14 +373,20 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                         obscureText: _obscureConfirmPassword,
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                            _obscureConfirmPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                             color: RegentColors.violet,
                           ),
-                          onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                          onPressed: () => setState(() =>
+                              _obscureConfirmPassword =
+                                  !_obscureConfirmPassword),
                         ),
                         validator: (value) {
-                          if (value == null || value.isEmpty) return 'Please confirm your password';
-                          if (value != _passwordController.text) return 'Passwords do not match';
+                          if (value == null || value.isEmpty)
+                            return 'Please confirm your password';
+                          if (value != _passwordController.text)
+                            return 'Passwords do not match';
                           return null;
                         },
                       ),
@@ -334,7 +401,8 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                           style: ElevatedButton.styleFrom(
                             backgroundColor: RegentColors.violet,
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16)),
                             elevation: 8,
                             shadowColor: RegentColors.violet.withOpacity(0.5),
                           ),
@@ -342,9 +410,13 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                               ? const SizedBox(
                                   width: 24,
                                   height: 24,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                      color: Colors.white, strokeWidth: 2),
                                 )
-                              : const Text('Create Account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                              : const Text('Create Account',
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold)),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -355,13 +427,16 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                         children: [
                           Text(
                             'Already have an account? ',
-                            style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                            style:
+                                TextStyle(color: Colors.white.withOpacity(0.7)),
                           ),
                           TextButton(
                             onPressed: () => Navigator.pop(context),
                             child: const Text(
                               'Login',
-                              style: TextStyle(color: RegentColors.lightViolet, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                  color: RegentColors.lightViolet,
+                                  fontWeight: FontWeight.bold),
                             ),
                           ),
                         ],
@@ -464,7 +539,8 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
           labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
           prefixIcon: Icon(icon, color: RegentColors.violet),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
         icon: const Icon(Icons.arrow_drop_down, color: RegentColors.violet),
       ),

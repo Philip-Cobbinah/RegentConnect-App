@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
@@ -77,15 +76,17 @@ class _StatusScreenState extends State<StatusScreen> {
       stream: _statusService.getMyStatuses(),
       builder: (context, snapshot) {
         final hasStatus = snapshot.hasData && snapshot.data!.docs.isNotEmpty;
-        
+
         return ListTile(
           leading: Stack(
             children: [
               CircleAvatar(
                 radius: 28,
-                backgroundColor: hasStatus ? RegentColors.violet : RegentColors.dmCard,
+                backgroundColor:
+                    hasStatus ? RegentColors.violet : RegentColors.dmCard,
                 child: hasStatus
-                    ? _buildStatusPreview(snapshot.data!.docs.first.data() as Map<String, dynamic>)
+                    ? _buildStatusPreview(snapshot.data!.docs.first.data()
+                        as Map<String, dynamic>)
                     : const Icon(Icons.person, color: Colors.white54, size: 30),
               ),
               Positioned(
@@ -96,14 +97,17 @@ class _StatusScreenState extends State<StatusScreen> {
                   decoration: BoxDecoration(
                     color: RegentColors.violet,
                     shape: BoxShape.circle,
-                    border: Border.all(color: RegentColors.dmBackground, width: 2),
+                    border:
+                        Border.all(color: RegentColors.dmBackground, width: 2),
                   ),
                   child: const Icon(Icons.add, color: Colors.white, size: 14),
                 ),
               ),
             ],
           ),
-          title: const Text('My Status', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+          title: const Text('My Status',
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
           subtitle: Text(
             hasStatus ? 'Tap to view' : 'Tap to add status update',
             style: const TextStyle(color: Colors.white54),
@@ -138,7 +142,9 @@ class _StatusScreenState extends State<StatusScreen> {
         width: 56,
         height: 56,
         decoration: BoxDecoration(
-          color: Color(int.parse(status['backgroundColor']?.replaceFirst('#', '0xFF') ?? '0xFF7C4DFF')),
+          color: Color(int.parse(
+              status['backgroundColor']?.replaceFirst('#', '0xFF') ??
+                  '0xFF7C4DFF')),
           shape: BoxShape.circle,
         ),
         child: const Center(
@@ -153,22 +159,25 @@ class _StatusScreenState extends State<StatusScreen> {
       stream: _statusService.getAllStatuses(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
+          return Center(
+              child: Text('Error: ${snapshot.error}',
+                  style: const TextStyle(color: Colors.white)));
         }
 
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator(color: RegentColors.violet));
+          return const Center(
+              child: CircularProgressIndicator(color: RegentColors.violet));
         }
 
         // Group statuses by user
         final Map<String, List<QueryDocumentSnapshot>> groupedStatuses = {};
         for (var doc in snapshot.data!.docs) {
           final data = doc.data() as Map<String, dynamic>;
-          final odbc = data['userId'] as String;
-          
+          final userId = data['userId'] as String;
+
           // Skip current user's statuses
           if (userId == _statusService.currentUserId) continue;
-          
+
           if (!groupedStatuses.containsKey(userId)) {
             groupedStatuses[userId] = [];
           }
@@ -180,9 +189,11 @@ class _StatusScreenState extends State<StatusScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.photo_camera_outlined, size: 60, color: Colors.white24),
+                Icon(Icons.photo_camera_outlined,
+                    size: 60, color: Colors.white24),
                 SizedBox(height: 16),
-                Text('No status updates', style: TextStyle(color: Colors.white54)),
+                Text('No status updates',
+                    style: TextStyle(color: Colors.white54)),
               ],
             ),
           );
@@ -191,7 +202,7 @@ class _StatusScreenState extends State<StatusScreen> {
         return ListView.builder(
           itemCount: groupedStatuses.length,
           itemBuilder: (context, index) {
-            final odbc = groupedStatuses.keys.elementAt(index);
+            final userId = groupedStatuses.keys.elementAt(index);
             final statuses = groupedStatuses[userId]!;
             final latestStatus = statuses.first.data() as Map<String, dynamic>;
             final hasViewed = _hasViewedAllStatuses(statuses);
@@ -215,14 +226,16 @@ class _StatusScreenState extends State<StatusScreen> {
                   child: latestStatus['userPhoto'] == null
                       ? Text(
                           (latestStatus['userName'] ?? 'U')[0].toUpperCase(),
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
                         )
                       : null,
                 ),
               ),
               title: Text(
                 latestStatus['userName'] ?? 'Unknown',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w600),
               ),
               subtitle: Text(
                 _getTimeAgo(latestStatus['createdAt']),
@@ -230,14 +243,16 @@ class _StatusScreenState extends State<StatusScreen> {
               ),
               trailing: statuses.length > 1
                   ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: RegentColors.violet.withOpacity(0.3),
+                        color: RegentColors.violet.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         '${statuses.length}',
-                        style: const TextStyle(color: RegentColors.violet, fontSize: 12),
+                        style: const TextStyle(
+                            color: RegentColors.violet, fontSize: 12),
                       ),
                     )
                   : null,
@@ -253,7 +268,8 @@ class _StatusScreenState extends State<StatusScreen> {
     for (var doc in statuses) {
       final data = doc.data() as Map<String, dynamic>;
       final views = List<Map<String, dynamic>>.from(data['views'] ?? []);
-      final hasViewed = views.any((view) => view['userId'] == _statusService.currentUserId);
+      final hasViewed =
+          views.any((view) => view['userId'] == _statusService.currentUserId);
       if (!hasViewed) return false;
     }
     return true;
@@ -272,7 +288,8 @@ class _StatusScreenState extends State<StatusScreen> {
   }
 
   void _viewMyStatuses(List<QueryDocumentSnapshot> docs) {
-    final statuses = docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+    final statuses =
+        docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -285,7 +302,8 @@ class _StatusScreenState extends State<StatusScreen> {
   }
 
   void _viewStatuses(List<QueryDocumentSnapshot> docs) {
-    final statuses = docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+    final statuses =
+        docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -320,39 +338,36 @@ class _StatusScreenState extends State<StatusScreen> {
           children: [
             const Text(
               'Create Status',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 22,
+              runSpacing: 18,
               children: [
                 _mediaOption(Icons.text_fields, 'Text', () {
                   Navigator.pop(context);
                   _createTextStatus();
                 }),
-                _mediaOption(Icons.photo, 'Gallery', () async {
+                _mediaOption(Icons.perm_media_rounded, 'Gallery', () {
                   Navigator.pop(context);
-                  final picker = ImagePicker();
-                  final image = await picker.pickImage(source: ImageSource.gallery);
-                  if (image != null) {
-                    _createMediaStatus(File(image.path), 'image');
-                  }
+                  _pickGalleryMedia();
                 }),
-                _mediaOption(Icons.camera_alt, 'Camera', () async {
+                _mediaOption(Icons.camera_alt, 'Photo', () {
                   Navigator.pop(context);
-                  final picker = ImagePicker();
-                  final image = await picker.pickImage(source: ImageSource.camera);
-                  if (image != null) {
-                    _createMediaStatus(File(image.path), 'image');
-                  }
+                  _pickCameraPhoto();
                 }),
-                _mediaOption(Icons.videocam, 'Video', () async {
+                _mediaOption(Icons.video_library_rounded, 'Video', () {
                   Navigator.pop(context);
-                  final picker = ImagePicker();
-                  final video = await picker.pickVideo(source: ImageSource.gallery);
-                  if (video != null) {
-                    _createMediaStatus(File(video.path), 'video');
-                  }
+                  _pickGalleryVideo();
+                }),
+                _mediaOption(Icons.videocam_rounded, 'Record', () {
+                  Navigator.pop(context);
+                  _recordVideo();
                 }),
               ],
             ),
@@ -374,13 +389,77 @@ class _StatusScreenState extends State<StatusScreen> {
             child: Icon(icon, color: Colors.white, size: 26),
           ),
           const SizedBox(height: 8),
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          Text(label,
+              style: const TextStyle(color: Colors.white70, fontSize: 12)),
         ],
       ),
     );
   }
 
-  void _createMediaStatus(File file, String type) {
+  Future<void> _pickGalleryMedia() async {
+    final media = await ImagePicker().pickMedia();
+    if (media == null || !mounted) return;
+    final type = _mediaTypeFor(media);
+    if (type == null) {
+      _showUnsupportedMedia();
+      return;
+    }
+    _createMediaStatus(media, type);
+  }
+
+  Future<void> _pickCameraPhoto() async {
+    final image = await ImagePicker().pickImage(
+      source: ImageSource.camera,
+      imageQuality: 95,
+    );
+    if (image != null && mounted) {
+      _createMediaStatus(image, 'image');
+    }
+  }
+
+  Future<void> _pickGalleryVideo() async {
+    final video = await ImagePicker().pickVideo(source: ImageSource.gallery);
+    if (video != null && mounted) {
+      _createMediaStatus(video, 'video');
+    }
+  }
+
+  Future<void> _recordVideo() async {
+    final video = await ImagePicker().pickVideo(
+      source: ImageSource.camera,
+      maxDuration: const Duration(seconds: 30),
+    );
+    if (video != null && mounted) {
+      _createMediaStatus(video, 'video');
+    }
+  }
+
+  String? _mediaTypeFor(XFile media) {
+    final mimeType = media.mimeType?.toLowerCase();
+    if (mimeType?.startsWith('image/') == true) return 'image';
+    if (mimeType?.startsWith('video/') == true) return 'video';
+    final extension = media.name.split('.').last.toLowerCase();
+    if (const {'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif'}
+        .contains(extension)) {
+      return 'image';
+    }
+    if (const {'mp4', 'mov', 'webm', 'm4v'}.contains(extension)) {
+      return 'video';
+    }
+    return null;
+  }
+
+  void _showUnsupportedMedia() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Choose a supported image or video file.',
+        ),
+      ),
+    );
+  }
+
+  void _createMediaStatus(XFile file, String type) {
     Navigator.push(
       context,
       MaterialPageRoute(

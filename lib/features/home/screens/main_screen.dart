@@ -5,11 +5,11 @@ import '../../../core/theme_provider.dart';
 import '../../../widgets/wave_clipper.dart';
 import '../../../widgets/regent_ai_fab.dart';
 import '../../chat/screens/chat_list_tab.dart';
+import '../../chat/screens/regent_chat_search_delegate.dart';
 import '../../calls/screens/calls_tab.dart';
 import '../../status/screens/status_tab.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../../p_questions/screens/academics_tab.dart';
-import '../../../services/chat_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -21,21 +21,18 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   int _selectedFilter = 0;
-  
-  final List<String> _filters = ['All', 'Unread', 'Groups'];
-  final ChatService _chatService = ChatService();
+
+  final List<String> _filters = ['All', 'Unread', 'Favorites', 'Groups'];
 
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDarkMode;
-    
-    final gradientColor1 = isDark 
-        ? const Color(0xFF1A1A2E) 
-        : const Color(0xFF4A148C);
-    final gradientColor2 = isDark 
-        ? const Color(0xFF16213E) 
-        : const Color(0xFF7B1FA2);
+
+    final gradientColor1 =
+        isDark ? RegentColors.darkBackground : RegentColors.primaryDark;
+    final gradientColor2 =
+        isDark ? RegentColors.darkSurface : RegentColors.primary;
 
     return Scaffold(
       body: Stack(
@@ -45,22 +42,23 @@ class _MainScreenState extends State<MainScreen> {
             children: [
               // Top Wave Header
               _buildTopHeader(gradientColor1, gradientColor2, isDark),
-              
+
               // Content Area - changes based on tab
               Expanded(
                 child: _buildContent(),
               ),
             ],
           ),
-          
+
           // Bottom Navigation with Wave - Always visible
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: _buildBottomNavigation(gradientColor1, gradientColor2, isDark),
+            child:
+                _buildBottomNavigation(gradientColor1, gradientColor2, isDark),
           ),
-          
+
           // Regent AI FAB
           const RegentAICrystalFab(),
         ],
@@ -82,7 +80,7 @@ class _MainScreenState extends State<MainScreen> {
               isTop: true,
             ),
           ),
-          
+
           // Content
           SafeArea(
             child: Padding(
@@ -91,7 +89,7 @@ class _MainScreenState extends State<MainScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 8),
-                  
+
                   // App Title and Actions
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -109,21 +107,24 @@ class _MainScreenState extends State<MainScreen> {
                           Tooltip(
                             message: 'Search',
                             child: IconButton(
-                              icon: const Icon(Icons.search, color: Colors.white),
+                              icon:
+                                  const Icon(Icons.search, color: Colors.white),
                               onPressed: () => _showSearch(),
                             ),
                           ),
                           Tooltip(
                             message: 'Find Users',
                             child: IconButton(
-                              icon: const Icon(Icons.people, color: Colors.white),
+                              icon:
+                                  const Icon(Icons.people, color: Colors.white),
                               onPressed: () => _showAllUsers(),
                             ),
                           ),
                           Tooltip(
                             message: 'Camera',
                             child: IconButton(
-                              icon: const Icon(Icons.camera_alt_outlined, color: Colors.white),
+                              icon: const Icon(Icons.camera_alt_outlined,
+                                  color: Colors.white),
                               onPressed: () => _navigateToTab(2),
                             ),
                           ),
@@ -131,9 +132,9 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Filter Chips - Only show on Chats tab (index 0)
                   if (_currentIndex == 0)
                     Row(
@@ -148,27 +149,29 @@ class _MainScreenState extends State<MainScreen> {
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 8),
                                   child: GestureDetector(
-                                    onTap: () => setState(() => _selectedFilter = index),
+                                    onTap: () =>
+                                        setState(() => _selectedFilter = index),
                                     child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 200),
+                                      duration:
+                                          const Duration(milliseconds: 200),
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 16,
                                         vertical: 8,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: isSelected 
-                                            ? Colors.white 
+                                        color: isSelected
+                                            ? Colors.white
                                             : Colors.white.withOpacity(0.2),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
                                         _filters[index],
                                         style: TextStyle(
-                                          color: isSelected 
-                                              ? color1 
+                                          color: isSelected
+                                              ? color1
                                               : Colors.white,
-                                          fontWeight: isSelected 
-                                              ? FontWeight.bold 
+                                          fontWeight: isSelected
+                                              ? FontWeight.bold
                                               : FontWeight.normal,
                                         ),
                                       ),
@@ -179,7 +182,7 @@ class _MainScreenState extends State<MainScreen> {
                             ),
                           ),
                         ),
-                        
+
                         // Add Button
                         Tooltip(
                           message: 'Create New',
@@ -269,14 +272,15 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
-    
+
     return GestureDetector(
       onTap: () => _navigateToTab(index),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white.withOpacity(0.2) : Colors.transparent,
+          color:
+              isSelected ? Colors.white.withOpacity(0.2) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
@@ -309,7 +313,7 @@ class _MainScreenState extends State<MainScreen> {
   void _showSearch() {
     showSearch(
       context: context,
-      delegate: ChatSearchDelegate(),
+      delegate: RegentChatSearchDelegate(),
     );
   }
 
@@ -347,7 +351,7 @@ class _MainScreenState extends State<MainScreen> {
                 subtitle: const Text('Start a conversation'),
                 onTap: () {
                   Navigator.pop(context);
-                  Navigator.pushNamed(context, '/chat-list');
+                  Navigator.pushNamed(context, '/users');
                 },
               ),
               ListTile(
@@ -386,41 +390,6 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-// Search Delegate
-class ChatSearchDelegate extends SearchDelegate {
-  @override
-  List<Widget>? buildActions(BuildContext context) {
-    return [
-      IconButton(
-        icon: const Icon(Icons.clear),
-        onPressed: () => query = '',
-      ),
-    ];
-  }
-
-  @override
-  Widget? buildLeading(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.arrow_back),
-      onPressed: () => close(context, null),
-    );
-  }
-
-  @override
-  Widget buildResults(BuildContext context) {
-    return Center(
-      child: Text('Search results for: $query'),
-    );
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    return const Center(
-      child: Text('Search chats, contacts, and messages'),
     );
   }
 }

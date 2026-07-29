@@ -30,6 +30,8 @@ dependencies:
   google_generative_ai: ^0.4.6
   file_picker: ^8.0.0+1
   image_picker: ^1.2.1
+  image_cropper: ^12.2.1
+  video_player: ^2.13.0
   shared_preferences: ^2.2.3
   google_fonts: ^6.0.0
   share_plus: ^7.2.0
@@ -38,6 +40,7 @@ dependencies:
   # UI
   cupertino_icons: ^1.0.8
   path_provider: ^2.1.5
+  flutter_webrtc: ^1.5.2
 
 dev_dependencies:
   flutter_test:
@@ -46,5 +49,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/sounds/

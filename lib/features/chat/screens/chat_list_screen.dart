@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../core/constants.dart';
 import '../../../core/theme.dart';
 import '../../../services/chat_service.dart';
 import '../../../services/status_service.dart';
@@ -56,37 +57,39 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
     try {
       // Search users
-      final usersSnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .get();
-      
+      final usersSnapshot =
+          await FirebaseFirestore.instance.collection('users').get();
+
       final userResults = usersSnapshot.docs
           .where((doc) {
             final data = doc.data();
             final name = (data['fullName'] ?? '').toString().toLowerCase();
             final email = (data['email'] ?? '').toString().toLowerCase();
-            return name.contains(query.toLowerCase()) || 
-                   email.contains(query.toLowerCase());
+            return name.contains(query.toLowerCase()) ||
+                email.contains(query.toLowerCase());
           })
           .where((doc) => doc.id != _chatService.currentUserId)
           .map((doc) => {
-            ...doc.data(),
-            'odbc': doc.id,
-            'type': 'user',
-          })
+                ...doc.data(),
+                'userId': doc.id,
+                'type': 'user',
+              })
           .toList();
 
       // Search messages in all chat rooms
       final chatRooms = await FirebaseFirestore.instance
-          .collection('chat_rooms')
-          .where('participants', arrayContains: _chatService.currentUserId)
+          .collection(AppConstants.chatsCollection)
+          .where(
+            'participants',
+            arrayContains: _chatService.currentMessagingId,
+          )
           .get();
 
       final messageResults = <Map<String, dynamic>>[];
 
       for (var room in chatRooms.docs) {
         final messages = await FirebaseFirestore.instance
-            .collection('chat_rooms')
+            .collection(AppConstants.chatsCollection)
             .doc(room.id)
             .collection('messages')
             .where('isDeleted', isEqualTo: false)
@@ -95,11 +98,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
         for (var msg in messages.docs) {
           final data = msg.data();
           final messageText = (data['message'] ?? '').toString().toLowerCase();
-          
+
           if (messageText.contains(query.toLowerCase())) {
-            final participants = List<String>.from(room.data()['participants'] ?? []);
+            final participants =
+                List<String>.from(room.data()['participants'] ?? []);
             final otherUserId = participants.firstWhere(
-              (id) => id != _chatService.currentUserId,
+              (id) => id != _chatService.currentMessagingId,
               orElse: () => '',
             );
 
@@ -112,7 +116,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 'senderName': data['senderName'],
                 'timestamp': data['timestamp'],
                 'otherUserId': otherUserId,
-                'otherUserName': userData?['fullName'] ?? userData?['email'] ?? 'Unknown',
+                'otherUserName':
+                    userData?['fullName'] ?? userData?['email'] ?? 'Unknown',
                 'otherUserPhoto': userData?['photoUrl'],
                 'type': 'message',
                 'chatRoomId': room.id,
@@ -132,7 +137,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
       setState(() {
         _searchResults = userResults;
-        _messageSearchResults = messageResults.take(20).toList(); // Limit to 20 results
+        _messageSearchResults =
+            messageResults.take(20).toList(); // Limit to 20 results
         _isLoadingSearch = false;
       });
     } catch (e) {
@@ -176,9 +182,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     builder: (context, snapshot) {
                       final unreadCount = snapshot.data ?? 0;
                       if (unreadCount == 0) return const SizedBox.shrink();
-                      
+
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: RegentColors.violet,
                           borderRadius: BorderRadius.circular(12),
@@ -205,7 +212,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
               return Stack(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.mark_chat_unread, color: Colors.white),
+                    icon:
+                        const Icon(Icons.mark_chat_unread, color: Colors.white),
                     onPressed: () => _showUnreadChats(),
                     tooltip: 'Unread messages',
                   ),
@@ -239,7 +247,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
             },
           ),
           IconButton(
-            icon: Icon(_isSearching ? Icons.close : Icons.search, color: Colors.white),
+            icon: Icon(_isSearching ? Icons.close : Icons.search,
+                color: Colors.white),
             onPressed: () {
               setState(() {
                 _isSearching = !_isSearching;
@@ -277,7 +286,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, size: 64, color: RegentColors.violet.withOpacity(0.5)),
+            Icon(Icons.search_off,
+                size: 64, color: RegentColors.violet.withOpacity(0.5)),
             const SizedBox(height: 16),
             Text(
               'No results for "$_searchQuery"',
@@ -346,7 +356,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   Widget _buildUserSearchTile(Map<String, dynamic> user) {
     final userName = user['fullName'] ?? user['email'] ?? 'Unknown';
     final userPhoto = user['photoUrl'];
-    final odbc = user['userId'];
+    final userId = user['userId'] as String;
 
     return ListTile(
       leading: CircleAvatar(
@@ -355,7 +365,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
         child: userPhoto == null
             ? Text(
                 userName[0].toUpperCase(),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold),
               )
             : null,
       ),
@@ -364,7 +375,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
         user['email'] ?? '',
         style: const TextStyle(color: Colors.white54, fontSize: 12),
       ),
-      trailing: const Icon(Icons.chat_bubble_outline, color: RegentColors.violet),
+      trailing:
+          const Icon(Icons.chat_bubble_outline, color: RegentColors.violet),
       onTap: () {
         setState(() {
           _isSearching = false;
@@ -390,7 +402,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final otherUserPhoto = msg['otherUserPhoto'];
     final timestamp = msg['timestamp'] as Timestamp?;
     final senderName = msg['senderName'] ?? 'Unknown';
-    final isMe = msg['senderId'] == _chatService.currentUserId;
+    final isMe = msg['senderId'] == _chatService.currentMessagingId;
 
     String timeStr = '';
     if (timestamp != null) {
@@ -400,7 +412,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
       final msgDay = DateTime(date.year, date.month, date.day);
 
       if (msgDay == today) {
-        timeStr = '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+        timeStr =
+            '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
       } else if (msgDay == today.subtract(const Duration(days: 1))) {
         timeStr = 'Yesterday';
       } else {
@@ -411,7 +424,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: RegentColors.dmCard,
-        backgroundImage: otherUserPhoto != null ? NetworkImage(otherUserPhoto) : null,
+        backgroundImage:
+            otherUserPhoto != null ? NetworkImage(otherUserPhoto) : null,
         child: otherUserPhoto == null
             ? Text(
                 otherUserName[0].toUpperCase(),
@@ -424,7 +438,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
           Expanded(
             child: Text(
               otherUserName,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w600),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -494,7 +509,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     }
 
     final endIndex = startIndex + query.length;
-    
+
     return RichText(
       maxLines: maxLines,
       overflow: TextOverflow.ellipsis,
@@ -528,11 +543,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
       stream: _chatService.getChatRooms(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
+          return Center(
+              child: Text('Error: ${snapshot.error}',
+                  style: const TextStyle(color: Colors.white)));
         }
 
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator(color: RegentColors.violet));
+          return const Center(
+              child: CircularProgressIndicator(color: RegentColors.violet));
         }
 
         final chatRooms = snapshot.data!.docs;
@@ -542,7 +560,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.chat_bubble_outline, size: 80, color: RegentColors.violet.withOpacity(0.5)),
+                Icon(Icons.chat_bubble_outline,
+                    size: 80, color: RegentColors.violet.withOpacity(0.5)),
                 const SizedBox(height: 16),
                 const Text(
                   'No conversations yet',
@@ -564,7 +583,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             final data = chatRooms[index].data() as Map<String, dynamic>;
             final participants = List<String>.from(data['participants'] ?? []);
             final otherUserId = participants.firstWhere(
-              (id) => id != _chatService.currentUserId,
+              (id) => id != _chatService.currentMessagingId,
               orElse: () => '',
             );
 
@@ -574,32 +593,45 @@ class _ChatListScreenState extends State<ChatListScreen> {
               future: _chatService.getUserData(otherUserId),
               builder: (context, userSnapshot) {
                 final userData = userSnapshot.data;
-                final userName = userData?['fullName'] ?? userData?['email'] ?? 'Unknown';
+                final userName =
+                    userData?['fullName'] ?? userData?['email'] ?? 'Unknown';
                 final userPhoto = userData?['photoUrl'];
                 final lastMessage = data['lastMessage'] ?? '';
                 final lastTime = data['lastMessageTime'] as Timestamp?;
-                
+
                 // Format time based on how recent
                 String timeStr = '';
                 if (lastTime != null) {
                   final now = DateTime.now();
                   final messageDate = lastTime.toDate();
                   final today = DateTime(now.year, now.month, now.day);
-                  final msgDay = DateTime(messageDate.year, messageDate.month, messageDate.day);
-                  
+                  final msgDay = DateTime(
+                      messageDate.year, messageDate.month, messageDate.day);
+
                   if (msgDay == today) {
                     // Today - show time
-                    timeStr = '${messageDate.hour.toString().padLeft(2, '0')}:${messageDate.minute.toString().padLeft(2, '0')}';
-                  } else if (msgDay == today.subtract(const Duration(days: 1))) {
+                    timeStr =
+                        '${messageDate.hour.toString().padLeft(2, '0')}:${messageDate.minute.toString().padLeft(2, '0')}';
+                  } else if (msgDay ==
+                      today.subtract(const Duration(days: 1))) {
                     // Yesterday
                     timeStr = 'Yesterday';
                   } else if (now.difference(messageDate).inDays < 7) {
                     // Within a week - show day name
-                    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                    final days = [
+                      'Mon',
+                      'Tue',
+                      'Wed',
+                      'Thu',
+                      'Fri',
+                      'Sat',
+                      'Sun'
+                    ];
                     timeStr = days[messageDate.weekday - 1];
                   } else {
                     // Older - show date
-                    timeStr = '${messageDate.day}/${messageDate.month}/${messageDate.year}';
+                    timeStr =
+                        '${messageDate.day}/${messageDate.month}/${messageDate.year}';
                   }
                 }
 
@@ -609,10 +641,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   builder: (context, typingSnapshot) {
                     String subtitleText = lastMessage;
                     bool isTyping = false;
-                    
+
                     if (typingSnapshot.hasData && typingSnapshot.data!.exists) {
-                      final typingData = typingSnapshot.data!.data() as Map<String, dynamic>?;
-                      final typing = typingData?['typing'] as Map<String, dynamic>?;
+                      final typingData =
+                          typingSnapshot.data!.data() as Map<String, dynamic>?;
+                      final typing =
+                          typingData?['typing'] as Map<String, dynamic>?;
                       if (typing?[otherUserId] != null) {
                         subtitleText = 'typing...';
                         isTyping = true;
@@ -620,7 +654,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     }
 
                     return _ChatListTile(
-                      odbc: otherUserId,
+                      userId: otherUserId,
                       userName: userName,
                       userPhoto: userPhoto,
                       lastMessage: subtitleText,
@@ -689,38 +723,54 @@ class _ChatListScreenState extends State<ChatListScreen> {
               padding: EdgeInsets.all(16),
               child: Text(
                 'Start a conversation',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold),
               ),
             ),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance.collection('users').snapshots(),
+                stream:
+                    FirebaseFirestore.instance.collection('users').snapshots(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator(color: RegentColors.violet));
+                    return const Center(
+                        child: CircularProgressIndicator(
+                            color: RegentColors.violet));
                   }
 
-                  final users = snapshot.data!.docs.where((doc) => doc.id != _chatService.currentUserId).toList();
+                  final users = snapshot.data!.docs
+                      .where((doc) => doc.id != _chatService.currentUserId)
+                      .toList();
 
                   return ListView.builder(
                     controller: scrollController,
                     itemCount: users.length,
                     itemBuilder: (context, index) {
-                      final userData = users[index].data() as Map<String, dynamic>;
-                      final odbc = users[index].id;
-                      final userName = userData['fullName'] ?? userData['email'] ?? 'Unknown';
+                      final userData =
+                          users[index].data() as Map<String, dynamic>;
+                      final userId = users[index].id;
+                      final userName = userData['fullName'] ??
+                          userData['email'] ??
+                          'Unknown';
                       final userPhoto = userData['photoUrl'];
 
                       return ListTile(
                         leading: CircleAvatar(
                           backgroundColor: RegentColors.violet,
-                          backgroundImage: userPhoto != null ? NetworkImage(userPhoto) : null,
+                          backgroundImage: userPhoto != null
+                              ? NetworkImage(userPhoto)
+                              : null,
                           child: userPhoto == null
-                              ? Text(userName[0].toUpperCase(), style: const TextStyle(color: Colors.white))
+                              ? Text(userName[0].toUpperCase(),
+                                  style: const TextStyle(color: Colors.white))
                               : null,
                         ),
-                        title: Text(userName, style: const TextStyle(color: Colors.white)),
-                        subtitle: Text(userData['email'] ?? '', style: const TextStyle(color: Colors.white54)),
+                        title: Text(userName,
+                            style: const TextStyle(color: Colors.white)),
+                        subtitle: Text(userData['email'] ?? '',
+                            style: const TextStyle(color: Colors.white54)),
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.push(
@@ -774,7 +824,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  const Icon(Icons.mark_chat_unread, color: RegentColors.violet),
+                  const Icon(Icons.mark_chat_unread,
+                      color: RegentColors.violet),
                   const SizedBox(width: 12),
                   const Text(
                     'Unread Messages',
@@ -803,7 +854,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
                     return const Center(
-                      child: CircularProgressIndicator(color: RegentColors.violet),
+                      child:
+                          CircularProgressIndicator(color: RegentColors.violet),
                     );
                   }
 
@@ -813,10 +865,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     controller: scrollController,
                     itemCount: chatRooms.length,
                     itemBuilder: (context, index) {
-                      final data = chatRooms[index].data() as Map<String, dynamic>;
-                      final participants = List<String>.from(data['participants'] ?? []);
+                      final data =
+                          chatRooms[index].data() as Map<String, dynamic>;
+                      final participants =
+                          List<String>.from(data['participants'] ?? []);
                       final otherUserId = participants.firstWhere(
-                        (id) => id != _chatService.currentUserId,
+                        (id) => id != _chatService.currentMessagingId,
                         orElse: () => '',
                       );
 
@@ -832,20 +886,22 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             future: _chatService.getUserData(otherUserId),
                             builder: (context, userSnapshot) {
                               final userData = userSnapshot.data;
-                              final userName = userData?['fullName'] ?? 
-                                  userData?['email'] ?? 'Unknown';
+                              final userName = userData?['fullName'] ??
+                                  userData?['email'] ??
+                                  'Unknown';
                               final userPhoto = userData?['photoUrl'];
 
                               return ListTile(
                                 leading: CircleAvatar(
                                   backgroundColor: RegentColors.violet,
-                                  backgroundImage: userPhoto != null 
-                                      ? NetworkImage(userPhoto) 
+                                  backgroundImage: userPhoto != null
+                                      ? NetworkImage(userPhoto)
                                       : null,
                                   child: userPhoto == null
                                       ? Text(
                                           userName[0].toUpperCase(),
-                                          style: const TextStyle(color: Colors.white),
+                                          style: const TextStyle(
+                                              color: Colors.white),
                                         )
                                       : null,
                                 ),
@@ -858,7 +914,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                 ),
                                 subtitle: Text(
                                   '$unreadCount unread message${unreadCount > 1 ? 's' : ''}',
-                                  style: const TextStyle(color: RegentColors.lightViolet),
+                                  style: const TextStyle(
+                                      color: RegentColors.lightViolet),
                                 ),
                                 trailing: Container(
                                   padding: const EdgeInsets.symmetric(
@@ -957,7 +1014,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
             CircleAvatar(
               radius: 40,
               backgroundColor: RegentColors.violet,
-              backgroundImage: userPhoto != null ? NetworkImage(userPhoto) : null,
+              backgroundImage:
+                  userPhoto != null ? NetworkImage(userPhoto) : null,
               child: userPhoto == null
                   ? Text(
                       userName[0].toUpperCase(),
@@ -999,7 +1057,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ElevatedButton.icon(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: isVideo ? RegentColors.violet : RegentColors.green,
+              backgroundColor:
+                  isVideo ? RegentColors.violet : RegentColors.green,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -1016,7 +1075,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
 // Separate widget to handle status checking for each chat tile
 class _ChatListTile extends StatelessWidget {
-  final String odbc;
+  final String userId;
   final String userName;
   final String? userPhoto;
   final String lastMessage;
@@ -1027,7 +1086,7 @@ class _ChatListTile extends StatelessWidget {
   final Function(List<Map<String, dynamic>>) onStatusTap;
 
   const _ChatListTile({
-    required this.odbc,
+    required this.userId,
     required this.userName,
     required this.userPhoto,
     required this.lastMessage,
@@ -1041,7 +1100,7 @@ class _ChatListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chatService = ChatService();
-    
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('statuses')
@@ -1049,16 +1108,21 @@ class _ChatListTile extends StatelessWidget {
           .where('expiresAt', isGreaterThan: Timestamp.now())
           .snapshots(),
       builder: (context, statusSnapshot) {
-        final hasStatus = statusSnapshot.hasData && statusSnapshot.data!.docs.isNotEmpty;
+        final hasStatus =
+            statusSnapshot.hasData && statusSnapshot.data!.docs.isNotEmpty;
         final statuses = hasStatus
-            ? statusSnapshot.data!.docs.map((doc) => doc.data() as Map<String, dynamic>).toList()
+            ? statusSnapshot.data!.docs
+                .map((doc) => doc.data() as Map<String, dynamic>)
+                .toList()
             : <Map<String, dynamic>>[];
 
         bool hasUnviewedStatus = false;
         if (hasStatus) {
           for (var status in statuses) {
-            final views = List<Map<String, dynamic>>.from(status['views'] ?? []);
-            final hasViewed = views.any((view) => view['userId'] == statusService.currentUserId);
+            final views =
+                List<Map<String, dynamic>>.from(status['views'] ?? []);
+            final hasViewed = views
+                .any((view) => view['userId'] == statusService.currentUserId);
             if (!hasViewed) {
               hasUnviewedStatus = true;
               break;
@@ -1081,7 +1145,11 @@ class _ChatListTile extends StatelessWidget {
                           shape: BoxShape.circle,
                           gradient: LinearGradient(
                             colors: hasUnviewedStatus
-                                ? [RegentColors.violet, RegentColors.darkViolet, RegentColors.lightViolet]
+                                ? [
+                                    RegentColors.violet,
+                                    RegentColors.darkViolet,
+                                    RegentColors.lightViolet
+                                  ]
                                 : [Colors.grey, Colors.grey.shade600],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -1089,7 +1157,8 @@ class _ChatListTile extends StatelessWidget {
                         )
                       : null,
                   child: Container(
-                    padding: hasStatus ? const EdgeInsets.all(2) : EdgeInsets.zero,
+                    padding:
+                        hasStatus ? const EdgeInsets.all(2) : EdgeInsets.zero,
                     decoration: hasStatus
                         ? const BoxDecoration(
                             shape: BoxShape.circle,
@@ -1099,11 +1168,15 @@ class _ChatListTile extends StatelessWidget {
                     child: CircleAvatar(
                       radius: 24,
                       backgroundColor: RegentColors.violet,
-                      backgroundImage: userPhoto != null ? NetworkImage(userPhoto!) : null,
+                      backgroundImage:
+                          userPhoto != null ? NetworkImage(userPhoto!) : null,
                       child: userPhoto == null
                           ? Text(
                               userName[0].toUpperCase(),
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18),
                             )
                           : null,
                     ),
@@ -1112,7 +1185,8 @@ class _ChatListTile extends StatelessWidget {
               ),
               title: Text(
                 userName,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w600),
               ),
               subtitle: Text(
                 lastMessage,
@@ -1130,15 +1204,19 @@ class _ChatListTile extends StatelessWidget {
                   Text(
                     timeStr,
                     style: TextStyle(
-                      color: unreadCount > 0 ? RegentColors.violet : Colors.white54,
+                      color: unreadCount > 0
+                          ? RegentColors.violet
+                          : Colors.white54,
                       fontSize: 12,
-                      fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+                      fontWeight:
+                          unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                   const SizedBox(height: 4),
                   if (unreadCount > 0)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: RegentColors.violet,
                         borderRadius: BorderRadius.circular(12),

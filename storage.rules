@@ -1,0 +1,219 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.role == 'admin';
+    }
+
+    function officialAccountIdForEmail(email) {
+      return
+        email == 'admissions@regent.edu.gh' ? 'official:admissions' :
+        email == 'registrar@regent.edu.gh' ? 'official:registrar' :
+        email == 'academics@regent.edu.gh' ? 'official:academic-unit' :
+        email == 'accounts@regent.edu.gh' ? 'official:finance' :
+        email == 'ess@regent.edu.gh' ? 'official:ess-client-assurance' :
+        email == 'src@regent.edu.gh' ? 'official:src' :
+        null;
+    }
+
+    function isOfficialEmail() {
+      return signedIn() &&
+        officialAccountIdForEmail(request.auth.token.email) != null;
+    }
+
+    function chatMember(chatId) {
+      let chat = firestore.get(
+        /databases/(default)/documents/chats/$(chatId)
+      ).data;
+      return signedIn() &&
+        (
+          request.auth.uid in chat.get('participants', []) ||
+          request.auth.uid in chat.get('participantAuthIds', []) ||
+          (
+            isOfficialEmail() &&
+            officialAccountIdForEmail(request.auth.token.email) in
+              chat.get('participants', [])
+          )
+        );
+    }
+
+    function groupMember(groupId) {
+      let group = firestore.get(
+        /databases/(default)/documents/groups/$(groupId)
+      ).data;
+      return signedIn() && request.auth.uid in group.get('members', []);
+    }
+
+    function groupAdmin(groupId) {
+      let group = firestore.get(
+        /databases/(default)/documents/groups/$(groupId)
+      ).data;
+      return signedIn() &&
+        (
+          group.createdBy == request.auth.uid ||
+          request.auth.uid in group.get('admins', [])
+        );
+    }
+
+    function broadcastMember(broadcastId) {
+      let broadcast = firestore.get(
+        /databases/(default)/documents/broadcasts/$(broadcastId)
+      ).data;
+      return signedIn() &&
+        (
+          broadcast.senderAuthId == request.auth.uid ||
+          request.auth.uid in broadcast.get('recipientIds', []) ||
+          (
+            isOfficialEmail() &&
+            officialAccountIdForEmail(request.auth.token.email) in
+              broadcast.get('recipientIds', [])
+          )
+        );
+    }
+
+    function validMedia(maxBytes) {
+      return request.resource == null ||
+        (
+          request.resource.size <= maxBytes &&
+          request.resource.contentType.matches(
+            'image/.*|video/.*|audio/.*|application/pdf|application/msword|application/vnd\\..*|text/plain|application/octet-stream'
+          )
+        );
+    }
+
+    function validImage(maxBytes) {
+      return request.resource == null ||
+        (
+          request.resource.size <= maxBytes &&
+          request.resource.contentType.matches('image/.*')
+        );
+    }
+
+    match /chat_media_v2/{chatId}/{uploaderUid}/{folder}/{fileName} {
+      allow read: if chatMember(chatId);
+      allow create, update: if signedIn() &&
+        request.auth.uid == uploaderUid &&
+        chatMember(chatId) &&
+        validMedia(100 * 1024 * 1024);
+      allow delete: if signedIn() &&
+        (request.auth.uid == uploaderUid || isAdmin());
+    }
+
+    match /group_media/{groupId}/{uploaderUid}/{mediaType}/{fileName} {
+      allow read: if groupMember(groupId);
+      allow create, update: if signedIn() &&
+        request.auth.uid == uploaderUid &&
+        groupMember(groupId) &&
+        (
+          firestore.get(
+            /databases/(default)/documents/groups/$(groupId)
+          ).data.membersCanPost != false ||
+          groupAdmin(groupId)
+        ) &&
+        validMedia(100 * 1024 * 1024);
+      allow delete: if signedIn() &&
+        (
+          request.auth.uid == uploaderUid ||
+          groupAdmin(groupId) ||
+          isAdmin()
+        );
+    }
+
+    match /status_media/{userId}/{mediaType}/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() &&
+        request.auth.uid == userId &&
+        validMedia(100 * 1024 * 1024);
+      allow delete: if signedIn() &&
+        (request.auth.uid == userId || isAdmin());
+    }
+
+    match /profile_pictures/{userId}/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() &&
+        request.auth.uid == userId &&
+        validImage(10 * 1024 * 1024);
+      allow delete: if signedIn() &&
+        (request.auth.uid == userId || isAdmin());
+    }
+
+    match /group_profiles/{groupId}/{uploaderUid}/{fileName} {
+      allow read: if groupMember(groupId);
+      allow create, update: if signedIn() &&
+        request.auth.uid == uploaderUid &&
+        groupAdmin(groupId) &&
+        validImage(10 * 1024 * 1024);
+      allow delete: if signedIn() && (groupAdmin(groupId) || isAdmin());
+    }
+
+    match /past_questions/{userId}/{questionId}/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() &&
+        request.auth.uid == userId &&
+        validMedia(50 * 1024 * 1024);
+      allow delete: if signedIn() &&
+        (request.auth.uid == userId || isAdmin());
+    }
+
+    match /questions/{userId}/{questionId}/{fileName} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() &&
+        request.auth.uid == userId &&
+        validMedia(50 * 1024 * 1024);
+      allow delete: if signedIn() &&
+        (request.auth.uid == userId || isAdmin());
+    }
+
+    match /broadcast_media/{broadcastId}/{uploaderUid}/{fileName} {
+      allow read: if broadcastMember(broadcastId);
+      allow create, update: if signedIn() &&
+        request.auth.uid == uploaderUid &&
+        broadcastMember(broadcastId) &&
+        validMedia(100 * 1024 * 1024);
+      allow delete: if signedIn() &&
+        (request.auth.uid == uploaderUid || isAdmin());
+    }
+
+    match /ai_media/{userId}/{allPaths=**} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create, update: if signedIn() &&
+        request.auth.uid == userId &&
+        validMedia(25 * 1024 * 1024);
+      allow delete: if signedIn() &&
+        (request.auth.uid == userId || isAdmin());
+    }
+
+    // Existing objects remain retrievable while current clients migrate to
+    // the owner- and conversation-scoped paths above.
+    match /chat_media/{userId}/{allPaths=**} {
+      allow read: if signedIn();
+      allow delete: if signedIn() &&
+        (request.auth.uid == userId || isAdmin());
+    }
+
+    match /profile_pictures/{fileName} {
+      allow read: if signedIn();
+    }
+
+    match /group_profiles/{fileName} {
+      allow read: if signedIn();
+    }
+
+    match /past_questions/{allPaths=**} {
+      allow read: if signedIn();
+    }
+
+    match /broadcasts/{allPaths=**} {
+      allow read: if signedIn();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

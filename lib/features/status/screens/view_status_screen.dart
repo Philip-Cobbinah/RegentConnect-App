@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+
 import '../../../core/theme.dart';
+import '../../../services/chat_service.dart';
 import '../../../services/status_service.dart';
 
 class ViewStatusScreen extends StatefulWidget {
@@ -20,11 +22,16 @@ class ViewStatusScreen extends StatefulWidget {
 class _ViewStatusScreenState extends State<ViewStatusScreen>
     with SingleTickerProviderStateMixin {
   final StatusService _statusService = StatusService();
-  
+  final ChatService _chatService = ChatService();
+
   int _currentIndex = 0;
   late AnimationController _progressController;
   VideoPlayerController? _videoController;
-  bool _isVideoMuted = false; // Track if video is muted by poster
+  Future<void>? _videoInitialization;
+  String? _videoError;
+  int _statusLoadGeneration = 0;
+  int _videoTrimStartMs = 0;
+  int _videoTrimEndMs = 0;
 
   @override
   void initState() {
@@ -37,37 +44,85 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
           _nextStatus();
         }
       });
-    
+
     _loadStatus();
   }
 
   void _loadStatus() {
+    _prepareStatus();
+  }
+
+  Future<void> _prepareStatus() async {
+    final generation = ++_statusLoadGeneration;
     final status = widget.statuses[_currentIndex];
-    
+    final previousController = _videoController;
+    _videoController = null;
+    _videoInitialization = null;
+    _videoError = null;
+    previousController?.removeListener(_handleVideoProgress);
+    await previousController?.dispose();
+
     // Mark as viewed if not owner
     if (!widget.isOwner) {
       _statusService.viewStatus(status['statusId']);
     }
 
-    _videoController?.dispose();
-    _videoController = null;
-
-    if (status['type'] == 'video' && status['mediaUrl'] != null) {
-      // Check if video was muted by poster
-      _isVideoMuted = status['isMuted'] == true;
-      
-      _videoController = VideoPlayerController.networkUrl(Uri.parse(status['mediaUrl']))
-        ..initialize().then((_) {
-          setState(() {});
-          // Apply mute setting from poster
-          _videoController!.setVolume(_isVideoMuted ? 0 : 1);
-          _videoController!.play();
-          _progressController.duration = _videoController!.value.duration;
-          _progressController.forward(from: 0);
-        });
-    } else {
+    if (status['type'] != 'video' || status['mediaUrl'] == null) {
       _progressController.duration = const Duration(seconds: 5);
       _progressController.forward(from: 0);
+      if (mounted) setState(() {});
+      return;
+    }
+
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(status['mediaUrl'].toString()),
+    );
+    _videoController = controller;
+    final initialization = controller.initialize();
+    _videoInitialization = initialization;
+    try {
+      await initialization;
+      if (!mounted || generation != _statusLoadGeneration) {
+        await controller.dispose();
+        return;
+      }
+
+      final totalMs = controller.value.duration.inMilliseconds;
+      final rawStart = status['trimStartMs'];
+      final rawEnd = status['trimEndMs'];
+      _videoTrimStartMs =
+          rawStart is num ? rawStart.toInt().clamp(0, totalMs) : 0;
+      _videoTrimEndMs = rawEnd is num
+          ? rawEnd.toInt().clamp(_videoTrimStartMs, totalMs)
+          : totalMs.clamp(0, 30000);
+      if (_videoTrimEndMs <= _videoTrimStartMs) {
+        _videoTrimEndMs = (_videoTrimStartMs + 30000).clamp(0, totalMs);
+      }
+
+      await controller.setVolume(status['isMuted'] == true ? 0 : 1);
+      await controller.seekTo(Duration(milliseconds: _videoTrimStartMs));
+      controller.addListener(_handleVideoProgress);
+      _progressController.duration = Duration(
+        milliseconds: (_videoTrimEndMs - _videoTrimStartMs).clamp(500, 30000),
+      );
+      _progressController.forward(from: 0);
+      await controller.play();
+      if (mounted) setState(() {});
+    } catch (_) {
+      if (!mounted || generation != _statusLoadGeneration) return;
+      _videoError = 'This video could not be played.';
+      _progressController.duration = const Duration(seconds: 5);
+      _progressController.forward(from: 0);
+      setState(() {});
+    }
+  }
+
+  void _handleVideoProgress() {
+    final controller = _videoController;
+    if (controller == null || !controller.value.isInitialized) return;
+    if (controller.value.position.inMilliseconds >= _videoTrimEndMs &&
+        _progressController.status != AnimationStatus.completed) {
+      _progressController.value = 1;
     }
   }
 
@@ -89,8 +144,11 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
 
   @override
   void dispose() {
+    _statusLoadGeneration++;
+    final controller = _videoController;
+    controller?.removeListener(_handleVideoProgress);
+    controller?.dispose();
     _progressController.dispose();
-    _videoController?.dispose();
     super.dispose();
   }
 
@@ -100,7 +158,9 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
 
     return Scaffold(
       backgroundColor: status['type'] == 'text'
-          ? Color(int.parse(status['backgroundColor']?.replaceFirst('#', '0xFF') ?? '0xFF7C4DFF'))
+          ? Color(int.parse(
+              status['backgroundColor']?.replaceFirst('#', '0xFF') ??
+                  '0xFF7C4DFF'))
           : Colors.black,
       body: GestureDetector(
         onTapDown: (details) {
@@ -111,21 +171,28 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
             _nextStatus();
           }
         },
-        onLongPressStart: (_) => _progressController.stop(),
-        onLongPressEnd: (_) => _progressController.forward(),
+        onLongPressStart: (_) {
+          _progressController.stop();
+          _videoController?.pause();
+        },
+        onLongPressEnd: (_) {
+          _progressController.forward();
+          _videoController?.play();
+        },
         child: Stack(
           fit: StackFit.expand,
           children: [
             // Status content
             _buildStatusContent(status),
-            
+
             // Top bar
             SafeArea(
               child: Column(
                 children: [
                   // Progress indicators
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     child: Row(
                       children: List.generate(widget.statuses.length, (index) {
                         return Expanded(
@@ -144,7 +211,8 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
                                 return LinearProgressIndicator(
                                   value: progress,
                                   backgroundColor: Colors.white30,
-                                  valueColor: const AlwaysStoppedAnimation(Colors.white),
+                                  valueColor: const AlwaysStoppedAnimation(
+                                      Colors.white),
                                 );
                               },
                             ),
@@ -185,7 +253,8 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
                               ),
                               Text(
                                 _getTimeAgo(status['createdAt']),
-                                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                style: const TextStyle(
+                                    color: Colors.white70, fontSize: 12),
                               ),
                             ],
                           ),
@@ -197,10 +266,47 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
                       ],
                     ),
                   ),
+                  if (status['taggedGroupId'] != null)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 11,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: Colors.white38),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              status['taggedGroupKind'] == 'channel'
+                                  ? Icons.campaign
+                                  : Icons.groups_2,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '@${status['taggedGroupName'] ?? 'Community'}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
-            
+
             // Bottom bar
             Positioned(
               bottom: 0,
@@ -217,7 +323,8 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
                           onTap: () => _showViewers(status),
                           child: Row(
                             children: [
-                              const Icon(Icons.visibility, color: Colors.white70, size: 20),
+                              const Icon(Icons.visibility,
+                                  color: Colors.white70, size: 20),
                               const SizedBox(width: 8),
                               Text(
                                 '${status['viewCount'] ?? 0}',
@@ -228,28 +335,48 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
                         ),
                         const Spacer(),
                         IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.white70),
+                          icon: const Icon(Icons.delete_outline,
+                              color: Colors.white70),
                           onPressed: () => _deleteStatus(status['statusId']),
                         ),
                       ] else ...[
                         // Reply for viewers
                         Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.white30),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => _showReplyComposer(status),
                               borderRadius: BorderRadius.circular(25),
-                            ),
-                            child: const Text(
-                              'Reply...',
-                              style: TextStyle(color: Colors.white54),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.white30),
+                                  borderRadius: BorderRadius.circular(25),
+                                ),
+                                child: const Text(
+                                  'Reply...',
+                                  style: TextStyle(color: Colors.white54),
+                                ),
+                              ),
                             ),
                           ),
+                        ),
+                        IconButton(
+                          tooltip: 'React',
+                          icon: const Icon(
+                            Icons.emoji_emotions_outlined,
+                            color: Colors.white70,
+                          ),
+                          onPressed: () => _showQuickReactions(status),
                         ),
                         if (status['allowReshare'] == true) ...[
                           const SizedBox(width: 10),
                           IconButton(
-                            icon: const Icon(Icons.share, color: Colors.white70),
+                            icon:
+                                const Icon(Icons.share, color: Colors.white70),
                             onPressed: () => _reshareStatus(status['statusId']),
                           ),
                         ],
@@ -259,14 +386,15 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
                 ),
               ),
             ),
-            
+
             // Reshared indicator
             if (status['isReshared'] == true)
               Positioned(
-                top: 100,
+                top: status['taggedGroupId'] != null ? 142 : 100,
                 left: 16,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: Colors.black45,
                     borderRadius: BorderRadius.circular(12),
@@ -278,7 +406,8 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
                       const SizedBox(width: 4),
                       Text(
                         'From ${status['originalUserName']}',
-                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 12),
                       ),
                     ],
                   ),
@@ -338,22 +467,13 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
         ],
       );
     } else {
-      // Video
       final isMuted = status['isMuted'] == true;
-      
+
       return Stack(
         fit: StackFit.expand,
         children: [
-          if (_videoController != null && _videoController!.value.isInitialized)
-            Center(
-              child: AspectRatio(
-                aspectRatio: _videoController!.value.aspectRatio,
-                child: VideoPlayer(_videoController!),
-              ),
-            )
-          else
-            const Center(child: CircularProgressIndicator(color: Colors.white)),
-          
+          _buildVideoContent(),
+
           // Muted indicator
           if (isMuted)
             Positioned(
@@ -378,7 +498,7 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
                 ),
               ),
             ),
-          
+
           if (status['text'] != null && status['text'].isNotEmpty)
             Positioned(
               bottom: 100,
@@ -402,6 +522,55 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
     }
   }
 
+  Widget _buildVideoContent() {
+    if (_videoError != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.broken_image_outlined,
+              color: Colors.white54,
+              size: 72,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _videoError!,
+              style: const TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final controller = _videoController;
+    final initialization = _videoInitialization;
+    if (controller == null || initialization == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
+    }
+    return FutureBuilder<void>(
+      future: initialization,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done ||
+            !controller.value.isInitialized) {
+          return const Center(
+            child: CircularProgressIndicator(color: Colors.white),
+          );
+        }
+        return Center(
+          child: AspectRatio(
+            aspectRatio: controller.value.aspectRatio > 0
+                ? controller.value.aspectRatio
+                : 16 / 9,
+            child: VideoPlayer(controller),
+          ),
+        );
+      },
+    );
+  }
+
   String _getTimeAgo(dynamic timestamp) {
     if (timestamp == null) return 'Just now';
     DateTime date;
@@ -416,6 +585,182 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     return '${diff.inDays}d ago';
+  }
+
+  Future<void> _showReplyComposer(Map<String, dynamic> status) async {
+    _progressController.stop();
+    await _videoController?.pause();
+    if (!mounted) return;
+    final replyController = TextEditingController();
+    var isSending = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: RegentColors.dmSurface,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Future<void> sendReply() async {
+              final reply = replyController.text.trim();
+              final receiverId = status['userId']?.toString() ?? '';
+              if (reply.isEmpty || receiverId.isEmpty || isSending) return;
+              setSheetState(() => isSending = true);
+              try {
+                await _chatService.sendMessage(
+                  receiverId: receiverId,
+                  message: reply,
+                  metadata: _statusReplyMetadata(status),
+                );
+                if (sheetContext.mounted) Navigator.pop(sheetContext);
+                if (mounted) {
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(content: Text('Reply sent')),
+                  );
+                }
+              } catch (_) {
+                if (sheetContext.mounted) {
+                  ScaffoldMessenger.of(sheetContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('The reply could not be sent.'),
+                    ),
+                  );
+                  setSheetState(() => isSending = false);
+                }
+              }
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  14,
+                  16,
+                  14 + MediaQuery.viewInsetsOf(context).bottom,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: replyController,
+                        autofocus: true,
+                        maxLength: 700,
+                        maxLines: 4,
+                        minLines: 1,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => sendReply(),
+                        decoration: InputDecoration(
+                          counterText: '',
+                          hintText:
+                              'Reply to ${status['userName'] ?? 'status'}',
+                          prefixIcon: const Icon(
+                            Icons.reply_rounded,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filled(
+                      tooltip: 'Send reply',
+                      onPressed: isSending ? null : sendReply,
+                      icon: isSending
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.send_rounded),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    replyController.dispose();
+    if (mounted) {
+      _progressController.forward();
+      _videoController?.play();
+    }
+  }
+
+  Future<void> _showQuickReactions(Map<String, dynamic> status) async {
+    _progressController.stop();
+    await _videoController?.pause();
+    if (!mounted) return;
+    const reactions = ['❤️', '😂', '😮', '😢', '🙏', '👏'];
+    final reaction = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: RegentColors.dmSurface,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: reactions.map((emoji) {
+              return InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () => Navigator.pop(context, emoji),
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Text(emoji, style: const TextStyle(fontSize: 30)),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+    if (reaction != null) {
+      final receiverId = status['userId']?.toString() ?? '';
+      if (receiverId.isNotEmpty) {
+        try {
+          await _chatService.sendMessage(
+            receiverId: receiverId,
+            message: reaction,
+            metadata: {
+              ..._statusReplyMetadata(status),
+              'isStatusReaction': true,
+            },
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('$reaction reaction sent')),
+            );
+          }
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('The reaction could not be sent.'),
+              ),
+            );
+          }
+        }
+      }
+    }
+    if (mounted) {
+      _progressController.forward();
+      _videoController?.play();
+    }
+  }
+
+  Map<String, dynamic> _statusReplyMetadata(
+    Map<String, dynamic> status,
+  ) {
+    return {
+      'isStatusReply': true,
+      'statusId': status['statusId'],
+      'statusType': status['type'],
+      'statusText': status['text'],
+      'statusMediaUrl': status['mediaUrl'],
+      'statusPosterName': status['userName'],
+    };
   }
 
   void _showViewers(Map<String, dynamic> status) {
@@ -433,7 +778,7 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
         expand: false,
         builder: (context, scrollController) {
           final views = List<Map<String, dynamic>>.from(status['views'] ?? []);
-          
+
           return Column(
             children: [
               Container(
@@ -483,8 +828,10 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
                                   : null,
                               child: view['userPhoto'] == null
                                   ? Text(
-                                      (view['userName'] ?? 'U')[0].toUpperCase(),
-                                      style: const TextStyle(color: Colors.white),
+                                      (view['userName'] ?? 'U')[0]
+                                          .toUpperCase(),
+                                      style:
+                                          const TextStyle(color: Colors.white),
                                     )
                                   : null,
                             ),
@@ -494,7 +841,8 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
                             ),
                             subtitle: Text(
                               view['viewedAt'] ?? '',
-                              style: const TextStyle(color: Colors.white54, fontSize: 12),
+                              style: const TextStyle(
+                                  color: Colors.white54, fontSize: 12),
                             ),
                           );
                         },
@@ -512,7 +860,8 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: RegentColors.dmSurface,
-        title: const Text('Delete Status', style: TextStyle(color: Colors.white)),
+        title:
+            const Text('Delete Status', style: TextStyle(color: Colors.white)),
         content: const Text(
           'Are you sure you want to delete this status?',
           style: TextStyle(color: Colors.white70),

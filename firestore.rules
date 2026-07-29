@@ -1,0 +1,455 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function owns(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.role == 'admin';
+    }
+
+    function officialAccountIdForEmail(email) {
+      return
+        email == 'admissions@regent.edu.gh' ? 'official:admissions' :
+        email == 'registrar@regent.edu.gh' ? 'official:registrar' :
+        email == 'academics@regent.edu.gh' ? 'official:academic-unit' :
+        email == 'accounts@regent.edu.gh' ? 'official:finance' :
+        email == 'ess@regent.edu.gh' ? 'official:ess-client-assurance' :
+        email == 'src@regent.edu.gh' ? 'official:src' :
+        null;
+    }
+
+    function isOfficialEmail() {
+      return signedIn() &&
+        officialAccountIdForEmail(request.auth.token.email) != null;
+    }
+
+    function messagingIdentity() {
+      return isOfficialEmail()
+        ? officialAccountIdForEmail(request.auth.token.email)
+        : request.auth.uid;
+    }
+
+    function validStandardProfile(userId, data) {
+      return data.uid == userId &&
+        data.email == request.auth.token.email &&
+        data.role == 'student' &&
+        data.get('isOfficial', false) == false &&
+        data.get('officialAccountId', null) == null &&
+        data.chatIdentity == userId;
+    }
+
+    function validOfficialProfile(userId, data) {
+      return data.uid == userId &&
+        data.email == request.auth.token.email &&
+        data.role == 'official' &&
+        data.isOfficial == true &&
+        officialAccountIdForEmail(request.auth.token.email) != null &&
+        data.officialAccountId ==
+          officialAccountIdForEmail(request.auth.token.email) &&
+        data.chatIdentity == data.officialAccountId;
+    }
+
+    function validOwnProfile(userId, data) {
+      return owns(userId) &&
+        (
+          validStandardProfile(userId, data) ||
+          validOfficialProfile(userId, data)
+        );
+    }
+
+    function participatesIn(chatData) {
+      return signedIn() &&
+        (
+          (
+            chatData.participants is list &&
+            (
+              request.auth.uid in chatData.participants ||
+              messagingIdentity() in chatData.participants
+            )
+          ) ||
+          (
+            chatData.participantAuthIds is list &&
+            request.auth.uid in chatData.participantAuthIds
+          )
+        );
+    }
+
+    function chatData(chatId) {
+      return get(/databases/$(database)/documents/chats/$(chatId)).data;
+    }
+
+    function groupData(groupId) {
+      return get(/databases/$(database)/documents/groups/$(groupId)).data;
+    }
+
+    function callData(callId) {
+      return get(/databases/$(database)/documents/calls/$(callId)).data;
+    }
+
+    function isCallParticipant(callId) {
+      return signedIn() &&
+        callData(callId).participantIds is list &&
+        request.auth.uid in callData(callId).participantIds;
+    }
+
+    function isGroupMember(groupId) {
+      return signedIn() &&
+        groupData(groupId).members is list &&
+        request.auth.uid in groupData(groupId).members;
+    }
+
+    function isGroupAdmin(groupId) {
+      return signedIn() &&
+        (
+          groupData(groupId).createdBy == request.auth.uid ||
+          (
+            groupData(groupId).admins is list &&
+            request.auth.uid in groupData(groupId).admins
+          )
+        );
+    }
+
+    match /official_offices/{officeId} {
+      allow read: if signedIn();
+      allow create, update: if isOfficialEmail() &&
+        request.resource.data.id == officeId &&
+        request.resource.data.chatIdentity == officeId &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.linkedAuthUid == request.auth.uid &&
+        request.resource.data.isVerified == true;
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn();
+      allow create, update: if validOwnProfile(userId, request.resource.data);
+      allow delete: if owns(userId) || isAdmin();
+
+      match /incoming_calls/{callId} {
+        allow read: if owns(userId);
+        allow create: if signedIn() &&
+          request.resource.data.callerId == request.auth.uid &&
+          request.resource.data.receiverId == userId;
+        allow update, delete: if owns(userId) ||
+          (
+            signedIn() &&
+            resource.data.callerId == request.auth.uid &&
+            resource.data.receiverId == userId
+          );
+      }
+
+      match /blockedUsers/{blockedUserId} {
+        allow read, write: if owns(userId);
+      }
+
+      match /favorites/{favoriteId} {
+        allow read, write: if owns(userId);
+      }
+
+      match /ai_chats/{sessionId} {
+        allow read, write: if owns(userId);
+
+        match /messages/{messageId} {
+          allow read, write: if owns(userId);
+        }
+      }
+    }
+
+    match /chats/{chatId} {
+      allow read: if participatesIn(resource.data);
+      allow create: if participatesIn(request.resource.data) &&
+        request.resource.data.participants is list &&
+        request.resource.data.participants.size() == 2 &&
+        request.resource.data.participantAuthIds is list &&
+        request.resource.data.participantAuthIds.size() <= 2 &&
+        request.auth.uid in request.resource.data.participantAuthIds;
+      allow update: if participatesIn(resource.data) &&
+        participatesIn(request.resource.data) &&
+        request.resource.data.participants == resource.data.participants &&
+        request.resource.data.participantAuthIds.hasAll(
+          resource.data.get('participantAuthIds', [])
+        ) &&
+        request.resource.data.participantAuthIds.size() <= 2 &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'participantAuthIds',
+          'lastMessage',
+          'lastMessageType',
+          'lastMessageTime',
+          'lastSenderId',
+          'lastSenderName',
+          'typing',
+          'updatedAt'
+        ]);
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if participatesIn(chatData(chatId));
+        allow create: if participatesIn(chatData(chatId)) &&
+          request.resource.data.senderAuthId == request.auth.uid &&
+          request.resource.data.senderId == messagingIdentity() &&
+          request.resource.data.receiverId in chatData(chatId).participants &&
+          request.resource.data.message is string &&
+          request.resource.data.message.size() <= 10000 &&
+          request.resource.data.type in [
+            'text', 'image', 'video', 'audio', 'file', 'poll'
+          ];
+        allow update: if participatesIn(chatData(chatId)) &&
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'isRead', 'reactions', 'starredBy', 'metadata'
+            ]) ||
+            (
+              (
+                resource.data.senderAuthId == request.auth.uid ||
+                resource.data.senderId == messagingIdentity()
+              ) &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'message',
+                'content',
+                'type',
+                'mediaUrl',
+                'mediaStoragePath',
+                'mediaName',
+                'mediaContentType',
+                'mediaSize',
+                'isDeleted',
+                'deletedForEveryone',
+                'deletedForMe',
+                'deletedFor',
+                'deletedBy',
+                'deletedByName',
+                'deletedAt',
+                'editedAt',
+                'reactions',
+                'starredBy',
+                'metadata'
+              ])
+            )
+          );
+        allow delete: if participatesIn(chatData(chatId)) &&
+          (
+            resource.data.senderAuthId == request.auth.uid ||
+            resource.data.senderId == messagingIdentity() ||
+            isAdmin()
+          );
+      }
+    }
+
+    match /groups/{groupId} {
+      allow read: if signedIn() &&
+        resource.data.members is list &&
+        request.auth.uid in resource.data.members;
+      allow create: if signedIn() &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.members is list &&
+        request.auth.uid in request.resource.data.members &&
+        request.resource.data.admins is list &&
+        request.auth.uid in request.resource.data.admins;
+      allow update: if isGroupAdmin(groupId) ||
+        (
+          isGroupMember(groupId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'lastMessage',
+            'lastMessageType',
+            'lastMessageTime',
+            'lastSenderId',
+            'lastSenderName',
+            'updatedAt'
+          ])
+        );
+      allow delete: if isGroupAdmin(groupId);
+
+      match /messages/{messageId} {
+        allow read: if isGroupMember(groupId);
+        allow create: if isGroupMember(groupId) &&
+          request.resource.data.senderId == request.auth.uid &&
+          request.resource.data.message is string &&
+          request.resource.data.message.size() <= 10000 &&
+          request.resource.data.type in [
+            'text', 'image', 'video', 'audio', 'file', 'poll'
+          ] &&
+          (
+            groupData(groupId).membersCanPost != false ||
+            isGroupAdmin(groupId)
+          );
+        allow update: if isGroupMember(groupId) &&
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'reactions', 'metadata'
+            ]) ||
+            isGroupAdmin(groupId) ||
+            resource.data.senderId == request.auth.uid
+          );
+        allow delete: if isGroupAdmin(groupId) ||
+          resource.data.senderId == request.auth.uid;
+      }
+    }
+
+    match /statuses/{statusId} {
+      allow read: if signedIn();
+      allow create: if signedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.type in ['text', 'image', 'video'] &&
+        request.resource.data.expiresAt is timestamp;
+      allow delete: if signedIn() &&
+        resource.data.userId == request.auth.uid;
+      allow update: if signedIn() &&
+        (
+          (
+            resource.data.userId == request.auth.uid &&
+            request.resource.data.userId == resource.data.userId &&
+            request.resource.data.statusId == resource.data.statusId
+          ) ||
+          (
+            request.resource.data.userId == resource.data.userId &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'likedBy'
+            ])
+          ) ||
+          (
+            request.resource.data.userId == resource.data.userId &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'views', 'viewCount'
+            ]) &&
+            request.resource.data.views is list &&
+            request.resource.data.viewCount ==
+              resource.data.get('viewCount', 0) + 1 &&
+            request.resource.data.views.size() ==
+              resource.data.get('views', []).size() + 1 &&
+            existsAfter(
+              /databases/$(database)/documents/statuses/$(statusId)/viewers/$(request.auth.uid)
+            )
+          )
+        );
+
+      match /viewers/{viewerId} {
+        allow create: if owns(viewerId) &&
+          request.resource.data.userId == request.auth.uid;
+        allow read: if signedIn() &&
+          (
+            viewerId == request.auth.uid ||
+            get(
+              /databases/$(database)/documents/statuses/$(statusId)
+            ).data.userId == request.auth.uid
+          );
+        allow update, delete: if false;
+      }
+    }
+
+    match /calls/{callId} {
+      allow read: if signedIn() &&
+        resource.data.participantIds is list &&
+        request.auth.uid in resource.data.participantIds;
+      allow create: if signedIn() &&
+        request.resource.data.callerId == request.auth.uid &&
+        request.resource.data.receiverId is string &&
+        request.resource.data.receiverId != request.auth.uid &&
+        request.resource.data.participantIds is list &&
+        request.resource.data.participantIds.size() == 2 &&
+        request.resource.data.participantIds.hasAll([
+          request.auth.uid,
+          request.resource.data.receiverId
+        ]);
+      allow update: if isCallParticipant(callId) &&
+        request.resource.data.callerId == resource.data.callerId &&
+        request.resource.data.receiverId == resource.data.receiverId &&
+        request.resource.data.participantIds == resource.data.participantIds;
+      allow delete: if isCallParticipant(callId);
+
+      match /{candidateCollection}/{candidateId} {
+        allow read, create, delete: if
+          candidateCollection in ['callerCandidates', 'calleeCandidates'] &&
+          isCallParticipant(callId);
+      }
+    }
+
+    match /broadcasts/{broadcastId} {
+      allow create: if signedIn() &&
+        request.resource.data.senderAuthId == request.auth.uid &&
+        request.resource.data.senderId == messagingIdentity() &&
+        request.resource.data.recipientIds is list;
+      allow read: if signedIn() &&
+        (
+          resource.data.senderAuthId == request.auth.uid ||
+          request.auth.uid in resource.data.recipientIds ||
+          messagingIdentity() in resource.data.recipientIds
+        );
+      allow update, delete: if signedIn() &&
+        resource.data.senderAuthId == request.auth.uid &&
+        request.resource.data.senderAuthId == resource.data.senderAuthId &&
+        request.resource.data.recipientIds == resource.data.recipientIds;
+    }
+
+    match /streaks/{streakId} {
+      allow read: if signedIn();
+      allow create: if signedIn() &&
+        (
+          request.resource.data.userId1 == request.auth.uid ||
+          request.resource.data.userId2 == request.auth.uid
+        );
+      allow update: if signedIn() &&
+        (
+          resource.data.userId1 == request.auth.uid ||
+          resource.data.userId2 == request.auth.uid
+        ) &&
+        request.resource.data.userId1 == resource.data.userId1 &&
+        request.resource.data.userId2 == resource.data.userId2;
+      allow delete: if false;
+    }
+
+    match /past_questions/{questionId} {
+      allow read: if signedIn();
+      allow create: if signedIn() &&
+        request.resource.data.uploadedBy == request.auth.uid;
+      allow update: if signedIn() &&
+        (
+          (
+            resource.data.uploadedBy == request.auth.uid &&
+            request.resource.data.uploadedBy == resource.data.uploadedBy
+          ) ||
+          isAdmin() ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'downloadCount'
+          ])
+        );
+      allow delete: if signedIn() &&
+        (
+          resource.data.uploadedBy == request.auth.uid ||
+          isAdmin()
+        );
+    }
+
+    match /questions/{questionId} {
+      allow read: if signedIn();
+      allow create: if signedIn() &&
+        request.resource.data.uploadedBy == request.auth.uid;
+      allow update: if signedIn() &&
+        (
+          (
+            resource.data.uploadedBy == request.auth.uid &&
+            request.resource.data.uploadedBy == resource.data.uploadedBy
+          ) ||
+          isAdmin() ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'downloadCount'
+          ])
+        );
+      allow delete: if signedIn() &&
+        (
+          resource.data.uploadedBy == request.auth.uid ||
+          isAdmin()
+        );
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

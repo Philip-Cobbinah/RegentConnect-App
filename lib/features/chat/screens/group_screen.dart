@@ -45,7 +45,8 @@ class _GroupScreenState extends State<GroupScreen> {
             actions: [
               TextButton(
                 onPressed: () {
-                  Clipboard.setData(ClipboardData(text: group.inviteLink ?? ''));
+                  Clipboard.setData(
+                      ClipboardData(text: group.inviteLink ?? ''));
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Link copied!')),
                   );
@@ -79,7 +80,7 @@ class _GroupScreenState extends State<GroupScreen> {
           children: [
             CircleAvatar(
               radius: 50,
-              backgroundColor: AppColors.primary.withOpacity(0.1),
+              backgroundColor: RegentColors.violet.withOpacity(0.1),
               child: IconButton(
                 icon: const Icon(Icons.camera_alt, size: 32),
                 onPressed: () {},
@@ -108,7 +109,7 @@ class _GroupScreenState extends State<GroupScreen> {
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _createGroup,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: RegentColors.violet,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),

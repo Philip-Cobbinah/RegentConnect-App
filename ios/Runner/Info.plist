@@ -2,6 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Regent Connect uses the camera to share photos in chats and statuses.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Regent Connect uses the microphone to record voice messages and make calls.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Regent Connect uses your photo library to share images and videos.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Regent Connect uses your location only when you choose to share it in a chat.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

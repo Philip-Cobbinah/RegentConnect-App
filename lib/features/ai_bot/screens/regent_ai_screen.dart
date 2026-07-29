@@ -26,16 +26,16 @@ class _RegentAIScreenState extends State<RegentAIScreen> {
   final AuthService _authService = AuthService();
   final ImagePicker _imagePicker = ImagePicker();
   final AIChatStorageService _storageService = AIChatStorageService();
-  final AudioRecorder _audioRecorder = AudioRecorder();
+  final Record _audioRecorder = Record();
   final AudioPlayer _audioPlayer = AudioPlayer();
-  
+
   bool _isLoading = false;
   bool _isLoadingHistory = true;
-  
+
   // Image preview
   Uint8List? _pendingImageData;
   String? _pendingImageSource;
-  
+
   // Audio recording
   bool _isRecording = false;
   bool _isPaused = false;
@@ -51,9 +51,9 @@ class _RegentAIScreenState extends State<RegentAIScreen> {
 
   Future<void> _loadChatHistory() async {
     setState(() => _isLoadingHistory = true);
-    
+
     final savedMessages = await _storageService.loadMessages();
-    
+
     setState(() {
       if (savedMessages.isEmpty) {
         _addWelcomeMessage();
@@ -62,14 +62,15 @@ class _RegentAIScreenState extends State<RegentAIScreen> {
       }
       _isLoadingHistory = false;
     });
-    
+
     _scrollToBottom();
   }
 
   void _addWelcomeMessage() {
     final userName = _authService.currentUser?.displayName ?? 'Student';
     _messages.add(AIChatMessage(
-      content: '''Hi $userName! 👋 I'm **Regent AI**, your personal academic assistant.
+      content:
+          '''Hi $userName! 👋 I'm **Regent AI**, your personal academic assistant.
 
 I can help you with:
 📚 **Academic Questions** - Any subject or topic
@@ -155,7 +156,7 @@ How can I assist you today?''',
   }
 
   // ============ IMAGE METHODS ============
-  
+
   Future<void> _captureFromCamera() async {
     try {
       final image = await _imagePicker.pickImage(
@@ -260,19 +261,20 @@ How can I assist you today?''',
     try {
       if (await _audioRecorder.hasPermission()) {
         final dir = await getTemporaryDirectory();
-        _recordingPath = '${dir.path}/regent_ai_audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
-        
+        _recordingPath =
+            '${dir.path}/regent_ai_audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
         await _audioRecorder.start(
-          const RecordConfig(encoder: AudioEncoder.aacLc),
+          encoder: AudioEncoder.aacLc,
           path: _recordingPath!,
         );
-        
+
         setState(() {
           _isRecording = true;
           _isPaused = false;
           _recordingDuration = 0;
         });
-        
+
         _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
           if (!_isPaused) {
             setState(() => _recordingDuration++);
@@ -303,14 +305,14 @@ How can I assist you today?''',
   Future<void> _cancelRecording() async {
     _recordingTimer?.cancel();
     await _audioRecorder.stop();
-    
+
     if (_recordingPath != null) {
       final file = File(_recordingPath!);
       if (await file.exists()) {
         await file.delete();
       }
     }
-    
+
     setState(() {
       _isRecording = false;
       _isPaused = false;
@@ -322,7 +324,7 @@ How can I assist you today?''',
   Future<void> _sendRecording() async {
     _recordingTimer?.cancel();
     final path = await _audioRecorder.stop();
-    
+
     if (path == null) {
       setState(() {
         _isRecording = false;
@@ -333,7 +335,7 @@ How can I assist you today?''',
     }
 
     final duration = _recordingDuration;
-    
+
     setState(() {
       _messages.add(AIChatMessage(
         content: '🎤 Voice message (${_formatDuration(duration)})',
@@ -356,7 +358,7 @@ How can I assist you today?''',
       // Read audio file and send to AI for transcription
       final file = File(path);
       final audioBytes = await file.readAsBytes();
-      
+
       final response = await _aiService.transcribeAudio(audioBytes);
 
       setState(() {
@@ -370,7 +372,8 @@ How can I assist you today?''',
     } catch (e) {
       setState(() {
         _messages.add(AIChatMessage(
-          content: 'I received your audio message. Unfortunately, I couldn\'t process it right now. Please try typing your question instead.',
+          content:
+              'I received your audio message. Unfortunately, I couldn\'t process it right now. Please try typing your question instead.',
           isUser: false,
           timestamp: DateTime.now(),
         ));
@@ -436,19 +439,30 @@ How can I assist you today?''',
     showModalBottomSheet(
       context: context,
       backgroundColor: RegentColors.dmSurface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) => Container(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Try asking about:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            const Text('Try asking about:',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white)),
             const SizedBox(height: 16),
-            _buildSuggestionTile('Explain the concept of Object-Oriented Programming', Icons.code),
-            _buildSuggestionTile('What are some effective study techniques for exams?', Icons.school),
-            _buildSuggestionTile('Help me understand database normalization', Icons.storage),
-            _buildSuggestionTile('Analyze this math problem from my photo', Icons.camera_alt),
+            _buildSuggestionTile(
+                'Explain the concept of Object-Oriented Programming',
+                Icons.code),
+            _buildSuggestionTile(
+                'What are some effective study techniques for exams?',
+                Icons.school),
+            _buildSuggestionTile(
+                'Help me understand database normalization', Icons.storage),
+            _buildSuggestionTile(
+                'Analyze this math problem from my photo', Icons.camera_alt),
           ],
         ),
       ),
@@ -458,7 +472,8 @@ How can I assist you today?''',
   Widget _buildSuggestionTile(String text, IconData icon) {
     return ListTile(
       leading: Icon(icon, color: RegentColors.violet),
-      title: Text(text, style: const TextStyle(fontSize: 14, color: Colors.white)),
+      title:
+          Text(text, style: const TextStyle(fontSize: 14, color: Colors.white)),
       onTap: () {
         Navigator.pop(context);
         _messageController.text = text;
@@ -472,24 +487,41 @@ How can I assist you today?''',
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: RegentColors.dmSurface,
-        title: const Row(children: [Icon(Icons.smart_toy, color: RegentColors.violet), SizedBox(width: 8), Text('About Regent AI', style: TextStyle(color: Colors.white))]),
+        title: const Row(children: [
+          Icon(Icons.smart_toy, color: RegentColors.violet),
+          SizedBox(width: 8),
+          Text('About Regent AI', style: TextStyle(color: Colors.white))
+        ]),
         content: const Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Regent AI is your personal academic assistant powered by advanced AI.', style: TextStyle(color: Colors.white70)),
+            Text(
+                'Regent AI is your personal academic assistant powered by advanced AI.',
+                style: TextStyle(color: Colors.white70)),
             SizedBox(height: 16),
-            Text('Features:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            Text('Features:',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, color: Colors.white)),
             SizedBox(height: 8),
-            Text('• Answer academic questions', style: TextStyle(color: Colors.white70)),
-            Text('• Analyze images (math, diagrams, etc)', style: TextStyle(color: Colors.white70)),
-            Text('• Transcribe audio notes', style: TextStyle(color: Colors.white70)),
-            Text('• Help with programming', style: TextStyle(color: Colors.white70)),
-            Text('• Provide study tips', style: TextStyle(color: Colors.white70)),
+            Text('• Answer academic questions',
+                style: TextStyle(color: Colors.white70)),
+            Text('• Analyze images (math, diagrams, etc)',
+                style: TextStyle(color: Colors.white70)),
+            Text('• Transcribe audio notes',
+                style: TextStyle(color: Colors.white70)),
+            Text('• Help with programming',
+                style: TextStyle(color: Colors.white70)),
+            Text('• Provide study tips',
+                style: TextStyle(color: Colors.white70)),
             Text('• Career guidance', style: TextStyle(color: Colors.white70)),
           ],
         ),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Got it'))],
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Got it'))
+        ],
       ),
     );
   }
@@ -506,13 +538,18 @@ How can I assist you today?''',
             CircleAvatar(
               radius: 18,
               backgroundColor: Colors.white,
-              child: Icon(Icons.smart_toy, color: RegentColors.violet, size: 20),
+              child:
+                  Icon(Icons.smart_toy, color: RegentColors.violet, size: 20),
             ),
             SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Regent AI', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                Text('Regent AI',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold)),
                 Text(
                   'Your Academic Assistant',
                   style: TextStyle(color: Colors.white70, fontSize: 12),
@@ -566,7 +603,8 @@ How can I assist you today?''',
         ],
       ),
       body: _isLoadingHistory
-          ? const Center(child: CircularProgressIndicator(color: RegentColors.violet))
+          ? const Center(
+              child: CircularProgressIndicator(color: RegentColors.violet))
           : Column(
               children: [
                 // Messages List
@@ -587,17 +625,21 @@ How can I assist you today?''',
                 ),
 
                 // Quick Actions
-                if (_messages.length <= 1 && _pendingImageData == null && !_isRecording)
+                if (_messages.length <= 1 &&
+                    _pendingImageData == null &&
+                    !_isRecording)
                   _buildQuickActions(),
 
                 // Recording UI
                 if (_isRecording) _buildRecordingUI(),
 
                 // Image Preview
-                if (_pendingImageData != null && !_isRecording) _buildImagePreview(),
+                if (_pendingImageData != null && !_isRecording)
+                  _buildImagePreview(),
 
                 // Input Field
-                if (!_isRecording && _pendingImageData == null) _buildInputField(),
+                if (!_isRecording && _pendingImageData == null)
+                  _buildInputField(),
               ],
             ),
     );
@@ -704,7 +746,8 @@ How can I assist you today?''',
             child: Icon(icon, color: Colors.white, size: 28),
           ),
           const SizedBox(height: 8),
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          Text(label,
+              style: const TextStyle(color: Colors.white70, fontSize: 12)),
         ],
       ),
     );
@@ -726,7 +769,8 @@ How can I assist you today?''',
               const SizedBox(width: 8),
               const Text(
                 'Image ready to send',
-                style: TextStyle(fontWeight: FontWeight.w600, color: RegentColors.violet),
+                style: TextStyle(
+                    fontWeight: FontWeight.w600, color: RegentColors.violet),
               ),
               const Spacer(),
               IconButton(
@@ -744,14 +788,16 @@ How can I assist you today?''',
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.memory(_pendingImageData!, width: 80, height: 80, fit: BoxFit.cover),
+                child: Image.memory(_pendingImageData!,
+                    width: 80, height: 80, fit: BoxFit.cover),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Add a message (optional):', style: TextStyle(fontSize: 12, color: Colors.white54)),
+                    Text('Add a message (optional):',
+                        style: TextStyle(fontSize: 12, color: Colors.white54)),
                     const SizedBox(height: 4),
                     Container(
                       decoration: BoxDecoration(
@@ -762,12 +808,15 @@ How can I assist you today?''',
                         controller: _messageController,
                         maxLines: 2,
                         minLines: 1,
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 14),
                         decoration: const InputDecoration(
                           hintText: 'E.g., "Solve this problem"',
-                          hintStyle: TextStyle(fontSize: 12, color: Colors.white38),
+                          hintStyle:
+                              TextStyle(fontSize: 12, color: Colors.white38),
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          contentPadding:
+                              EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
                       ),
                     ),
@@ -776,10 +825,15 @@ How can I assist you today?''',
               ),
               const SizedBox(width: 8),
               Container(
-                decoration: const BoxDecoration(color: RegentColors.violet, shape: BoxShape.circle),
+                decoration: const BoxDecoration(
+                    color: RegentColors.violet, shape: BoxShape.circle),
                 child: IconButton(
                   icon: _isLoading
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
                       : const Icon(Icons.send, color: Colors.white),
                   onPressed: _isLoading ? null : _sendImageWithMessage,
                 ),
@@ -797,17 +851,27 @@ How can I assist you today?''',
       decoration: BoxDecoration(
         color: RegentColors.dmSurface,
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, -2)),
+          BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, -2)),
         ],
       ),
       child: SafeArea(
         child: Row(
           children: [
-            IconButton(icon: const Icon(Icons.camera_alt, color: RegentColors.violet), onPressed: _captureFromCamera),
-            IconButton(icon: const Icon(Icons.add_photo_alternate, color: RegentColors.lightViolet), onPressed: _uploadFromGallery),
+            IconButton(
+                icon: const Icon(Icons.camera_alt, color: RegentColors.violet),
+                onPressed: _captureFromCamera),
+            IconButton(
+                icon: const Icon(Icons.add_photo_alternate,
+                    color: RegentColors.lightViolet),
+                onPressed: _uploadFromGallery),
             Expanded(
               child: Container(
-                decoration: BoxDecoration(color: RegentColors.dmCard, borderRadius: BorderRadius.circular(24)),
+                decoration: BoxDecoration(
+                    color: RegentColors.dmCard,
+                    borderRadius: BorderRadius.circular(24)),
                 child: TextField(
                   controller: _messageController,
                   maxLines: 4,
@@ -819,7 +883,8 @@ How can I assist you today?''',
                     hintText: 'Ask Regent AI anything...',
                     hintStyle: TextStyle(color: Colors.white38),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   ),
                 ),
               ),
@@ -829,10 +894,15 @@ How can I assist you today?''',
               onPressed: _startRecording,
             ),
             Container(
-              decoration: const BoxDecoration(color: RegentColors.violet, shape: BoxShape.circle),
+              decoration: const BoxDecoration(
+                  color: RegentColors.violet, shape: BoxShape.circle),
               child: IconButton(
                 icon: _isLoading
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.send, color: Colors.white),
                 onPressed: _isLoading ? null : _sendMessage,
               ),
@@ -849,7 +919,8 @@ How can I assist you today?''',
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment:
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isUser) ...[
@@ -877,10 +948,30 @@ How can I assist you today?''',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (message.imageData != null) ...[
+                    if (message.imageData != null ||
+                        message.imageUrl != null) ...[
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.memory(message.imageData!, width: 200, height: 200, fit: BoxFit.cover),
+                        child: message.imageData != null
+                            ? Image.memory(
+                                message.imageData!,
+                                width: 200,
+                                height: 200,
+                                fit: BoxFit.cover,
+                              )
+                            : Image.network(
+                                message.imageUrl!,
+                                width: 200,
+                                height: 200,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const SizedBox(
+                                  width: 200,
+                                  height: 120,
+                                  child: Center(
+                                    child: Icon(Icons.broken_image_outlined),
+                                  ),
+                                ),
+                              ),
                       ),
                       const SizedBox(height: 8),
                     ],
@@ -888,7 +979,8 @@ How can I assist you today?''',
                       GestureDetector(
                         onTap: () => _playAudio(message.audioUrl!),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
@@ -910,12 +1002,14 @@ How can I assist you today?''',
                     ],
                     SelectableText(
                       message.content.replaceAll('**', '').replaceAll('`', ''),
-                      style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.4),
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 15, height: 1.4),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       _formatTime(message.timestamp),
-                      style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.6)),
+                      style: TextStyle(
+                          fontSize: 10, color: Colors.white.withOpacity(0.6)),
                     ),
                   ],
                 ),
@@ -945,9 +1039,14 @@ How can I assist you today?''',
         children: [
           Icon(Icons.smart_toy, size: 80, color: RegentColors.violet),
           SizedBox(height: 24),
-          Text('Regent AI', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+          Text('Regent AI',
+              style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white)),
           SizedBox(height: 8),
-          Text('Your intelligent academic assistant', style: TextStyle(color: Colors.white54, fontSize: 16)),
+          Text('Your intelligent academic assistant',
+              style: TextStyle(color: Colors.white54, fontSize: 16)),
         ],
       ),
     );
@@ -958,12 +1057,19 @@ How can I assist you today?''',
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          const CircleAvatar(radius: 16, backgroundColor: RegentColors.violet, child: Icon(Icons.smart_toy, color: Colors.white, size: 18)),
+          const CircleAvatar(
+              radius: 16,
+              backgroundColor: RegentColors.violet,
+              child: Icon(Icons.smart_toy, color: Colors.white, size: 18)),
           const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: RegentColors.dmCard, borderRadius: BorderRadius.circular(16)),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [_buildDot(0), _buildDot(1), _buildDot(2)]),
+            decoration: BoxDecoration(
+                color: RegentColors.dmCard,
+                borderRadius: BorderRadius.circular(16)),
+            child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [_buildDot(0), _buildDot(1), _buildDot(2)]),
           ),
         ],
       ),
@@ -979,14 +1085,21 @@ How can I assist you today?''',
           margin: const EdgeInsets.symmetric(horizontal: 2),
           width: 8,
           height: 8,
-          decoration: BoxDecoration(color: RegentColors.violet.withOpacity(0.3 + (value * 0.7)), shape: BoxShape.circle),
+          decoration: BoxDecoration(
+              color: RegentColors.violet.withOpacity(0.3 + (value * 0.7)),
+              shape: BoxShape.circle),
         );
       },
     );
   }
 
   Widget _buildQuickActions() {
-    final suggestions = ['📚 Explain a concept', '💻 Help with code', '📝 Study tips', '🎯 Career advice'];
+    final suggestions = [
+      '📚 Explain a concept',
+      '💻 Help with code',
+      '📝 Study tips',
+      '🎯 Career advice'
+    ];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: SingleChildScrollView(
@@ -996,10 +1109,12 @@ How can I assist you today?''',
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: ActionChip(
-                label: Text(suggestion, style: const TextStyle(color: Colors.white)),
+                label: Text(suggestion,
+                    style: const TextStyle(color: Colors.white)),
                 backgroundColor: RegentColors.dmCard,
                 side: BorderSide(color: RegentColors.violet.withOpacity(0.5)),
-                onPressed: () => _messageController.text = suggestion.substring(2).trim(),
+                onPressed: () =>
+                    _messageController.text = suggestion.substring(2).trim(),
               ),
             );
           }).toList(),
@@ -1011,7 +1126,10 @@ How can I assist you today?''',
   void _copyMessage(String content) {
     Clipboard.setData(ClipboardData(text: content));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Message copied to clipboard'), duration: Duration(seconds: 1), backgroundColor: RegentColors.violet),
+      const SnackBar(
+          content: Text('Message copied to clipboard'),
+          duration: Duration(seconds: 1),
+          backgroundColor: RegentColors.violet),
     );
   }
 
@@ -1020,24 +1138,6 @@ How can I assist you today?''',
     final minute = time.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
   }
-}
-
-class AIChatMessage {
-  final String content;
-  final bool isUser;
-  final DateTime timestamp;
-  final Uint8List? imageData;
-  final String? audioUrl;
-  final int? audioDuration;
-
-  AIChatMessage({
-    required this.content,
-    required this.isUser,
-    required this.timestamp,
-    this.imageData,
-    this.audioUrl,
-    this.audioDuration,
-  });
 }
 
 // Add this class at the end of the file
@@ -1050,7 +1150,7 @@ class TrianglePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final scaledSize = Size(size.width * scale, size.height * scale);
     final rect = Rect.fromLTWH(0, 0, scaledSize.width, scaledSize.height);
-    
+
     // Main violet gradient triangle
     final violetPaint = Paint()
       ..shader = LinearGradient(
@@ -1075,75 +1175,88 @@ class TrianglePainter extends CustomPainter {
 
     // Draw rounded triangle shape
     final path = Path();
-    
+
     const radius = 12.0;
     final centerX = scaledSize.width / 2;
-    
+
     // Triangle points
     final topPoint = Offset(centerX, 4);
     final bottomLeftPoint = Offset(4, scaledSize.height - 4);
-    final bottomRightPoint = Offset(scaledSize.width - 4, scaledSize.height - 4);
-    
+    final bottomRightPoint =
+        Offset(scaledSize.width - 4, scaledSize.height - 4);
+
     path.moveTo(topPoint.dx, topPoint.dy + radius);
-    
+
     // Top to bottom right
     path.quadraticBezierTo(
-      topPoint.dx + radius / 2, topPoint.dy,
-      topPoint.dx + radius, topPoint.dy + radius / 2,
+      topPoint.dx + radius / 2,
+      topPoint.dy,
+      topPoint.dx + radius,
+      topPoint.dy + radius / 2,
     );
     path.lineTo(bottomRightPoint.dx - radius, bottomRightPoint.dy - radius);
-    
+
     // Bottom right corner
     path.quadraticBezierTo(
-      bottomRightPoint.dx, bottomRightPoint.dy - radius / 2,
-      bottomRightPoint.dx, bottomRightPoint.dy,
+      bottomRightPoint.dx,
+      bottomRightPoint.dy - radius / 2,
+      bottomRightPoint.dx,
+      bottomRightPoint.dy,
     );
     path.quadraticBezierTo(
-      bottomRightPoint.dx - radius / 2, bottomRightPoint.dy,
-      bottomRightPoint.dx - radius, bottomRightPoint.dy,
+      bottomRightPoint.dx - radius / 2,
+      bottomRightPoint.dy,
+      bottomRightPoint.dx - radius,
+      bottomRightPoint.dy,
     );
-    
+
     // Bottom right to bottom left
     path.lineTo(bottomLeftPoint.dx + radius, bottomLeftPoint.dy);
-    
+
     // Bottom left corner
     path.quadraticBezierTo(
-      bottomLeftPoint.dx + radius / 2, bottomLeftPoint.dy,
-      bottomLeftPoint.dx, bottomLeftPoint.dy,
+      bottomLeftPoint.dx + radius / 2,
+      bottomLeftPoint.dy,
+      bottomLeftPoint.dx,
+      bottomLeftPoint.dy,
     );
     path.quadraticBezierTo(
-      bottomLeftPoint.dx, bottomLeftPoint.dy - radius / 2,
-      bottomLeftPoint.dx + radius, bottomLeftPoint.dy - radius,
+      bottomLeftPoint.dx,
+      bottomLeftPoint.dy - radius / 2,
+      bottomLeftPoint.dx + radius,
+      bottomLeftPoint.dy - radius,
     );
-    
+
     // Bottom left to top
     path.lineTo(topPoint.dx - radius, topPoint.dy + radius / 2);
     path.quadraticBezierTo(
-      topPoint.dx - radius / 2, topPoint.dy,
-      topPoint.dx, topPoint.dy + radius,
+      topPoint.dx - radius / 2,
+      topPoint.dy,
+      topPoint.dx,
+      topPoint.dy + radius,
     );
-    
+
     path.close();
 
     // Draw main shape
     canvas.drawPath(path, violetPaint);
-    
+
     // Draw cream accent triangle (smaller, at top-right)
     final accentPath = Path();
     accentPath.moveTo(scaledSize.width - 8, 16);
     accentPath.lineTo(scaledSize.width - 8, 28);
     accentPath.lineTo(scaledSize.width - 20, 22);
     accentPath.close();
-    
+
     canvas.drawPath(accentPath, creamPaint);
-    
+
     // Draw another cream accent (bottom-left)
     final accentPath2 = Path();
     accentPath2.moveTo(12, scaledSize.height - 12);
     accentPath2.lineTo(24, scaledSize.height - 12);
     accentPath2.lineTo(18, scaledSize.height - 22);
     accentPath2.close();
-    
+
     canvas.drawPath(accentPath2, creamPaint);
   }
 

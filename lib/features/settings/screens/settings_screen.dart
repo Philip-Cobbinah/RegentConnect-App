@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme.dart';
 import '../../../core/theme_provider.dart';
+import '../../../core/student_progress.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/block_service.dart';
+import '../../auth/screens/officer_access_screen.dart';
+import '../../info/screens/regent_university_info_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -40,8 +44,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // Profile Header
               Container(
                 padding: const EdgeInsets.all(24),
-                color: isDark 
-                    ? const Color(0xFF2D2D2D) 
+                color: isDark
+                    ? RegentColors.darkCard
                     : RegentColors.blue.withOpacity(0.1),
                 child: Column(
                   children: [
@@ -56,10 +60,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               backgroundImage: userData['photoUrl'] != null
                                   ? NetworkImage(userData['photoUrl'])
                                   : null,
-                              backgroundColor: isDark ? Colors.grey[700] : Colors.grey[300],
+                              backgroundColor:
+                                  isDark ? Colors.grey[700] : Colors.grey[300],
                               child: userData['photoUrl'] == null
                                   ? Text(
-                                      user?.displayName?[0].toUpperCase() ?? '?',
+                                      user?.displayName?[0].toUpperCase() ??
+                                          '?',
                                       style: const TextStyle(fontSize: 36),
                                     )
                                   : null,
@@ -95,8 +101,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     Text(
                       user?.email ?? '',
-                      style: TextStyle(color: isDark ? Colors.white70 : Colors.grey),
+                      style: TextStyle(
+                          color: isDark ? Colors.white70 : Colors.grey),
                     ),
+                    if ((userData['session'] ?? '').toString().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Session: ${userData['session']}',
+                        style: TextStyle(
+                          color: isDark ? Colors.white70 : Colors.grey,
+                        ),
+                      ),
+                    ],
+                    if ((userData['expectedGraduationYear'] ?? '')
+                            .toString()
+                            .isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Expected graduation: ${userData['expectedGraduationYear']}',
+                        style: TextStyle(
+                          color: isDark ? Colors.white70 : Colors.grey,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -112,11 +139,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 title: Text(
                   'Dark Mode',
-                  style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                  style:
+                      TextStyle(color: isDark ? Colors.white : Colors.black87),
                 ),
                 subtitle: Text(
                   isDark ? 'Dark theme enabled' : 'Light theme enabled',
-                  style: TextStyle(color: isDark ? Colors.white70 : Colors.grey),
+                  style:
+                      TextStyle(color: isDark ? Colors.white70 : Colors.grey),
                 ),
                 value: isDark,
                 onChanged: (value) {
@@ -156,7 +185,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildSettingsTile(
                 icon: Icons.info_outline,
                 title: 'About',
-                subtitle: userData['about'] ?? 'Hey there! I\'m using Regent Connect',
+                subtitle:
+                    userData['about'] ?? 'Hey there! I\'m using Regent Connect',
                 isDark: isDark,
                 onTap: () => _editAbout(userData['about']),
               ),
@@ -165,16 +195,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildSectionHeader('Privacy', isDark),
 
               SwitchListTile(
-                secondary: Icon(Icons.visibility, color: isDark ? Colors.white70 : RegentColors.blue),
-                title: Text('Show Online Status', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                secondary: Icon(Icons.visibility,
+                    color: isDark ? Colors.white70 : RegentColors.blue),
+                title: Text('Show Online Status',
+                    style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87)),
                 value: userData['showOnlineStatus'] ?? true,
                 onChanged: (value) => _updateSetting('showOnlineStatus', value),
               ),
               const Divider(height: 1),
 
               SwitchListTile(
-                secondary: Icon(Icons.receipt_long, color: isDark ? Colors.white70 : RegentColors.blue),
-                title: Text('Read Receipts', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                secondary: Icon(Icons.receipt_long,
+                    color: isDark ? Colors.white70 : RegentColors.blue),
+                title: Text('Read Receipts',
+                    style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87)),
                 value: userData['readReceipts'] ?? true,
                 onChanged: (value) => _updateSetting('readReceipts', value),
               ),
@@ -183,10 +219,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildSectionHeader('Notifications', isDark),
 
               SwitchListTile(
-                secondary: Icon(Icons.notifications, color: isDark ? Colors.white70 : RegentColors.blue),
-                title: Text('Push Notifications', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                secondary: Icon(Icons.notifications,
+                    color: isDark ? Colors.white70 : RegentColors.blue),
+                title: Text('Push Notifications',
+                    style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87)),
                 value: userData['pushNotifications'] ?? true,
-                onChanged: (value) => _updateSetting('pushNotifications', value),
+                onChanged: (value) =>
+                    _updateSetting('pushNotifications', value),
+              ),
+
+              _buildSectionHeader('Regent support', isDark),
+              _buildSettingsTile(
+                icon: Icons.verified_user_outlined,
+                title: 'Official office access',
+                subtitle: 'See how students contact offices and officers reply',
+                isDark: isDark,
+                iconColor: RegentColors.violet,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const OfficerAccessScreen(),
+                  ),
+                ),
+              ),
+
+              _buildSettingsTile(
+                icon: Icons.school_outlined,
+                title: 'Regent University info',
+                subtitle: 'View the school profile, programmes, and contacts',
+                isDark: isDark,
+                iconColor: RegentColors.green,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const RegentUniversityInfoScreen(),
+                  ),
+                ),
+              ),
+
+              _buildSettingsTile(
+                icon: Icons.groups_rounded,
+                title: 'Alumni hub',
+                subtitle: StudentProgress.isAlumniProfile(userData)
+                    ? 'Open the alumni network and graduate updates'
+                    : 'See your graduation timeline and alumni network',
+                isDark: isDark,
+                iconColor: RegentColors.violet,
+                onTap: () => Navigator.pushNamed(context, '/alumni'),
               ),
 
               // Account Actions
@@ -210,32 +290,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 title: Text(
                   'Invite Friends',
-                  style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                  style:
+                      TextStyle(color: isDark ? Colors.white : Colors.black87),
                 ),
                 subtitle: Text(
                   'Share Regent Connect with friends',
-                  style: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
+                  style:
+                      TextStyle(color: isDark ? Colors.white54 : Colors.grey),
                 ),
-                trailing: Icon(Icons.chevron_right, color: isDark ? Colors.white54 : Colors.grey),
+                trailing: Icon(Icons.chevron_right,
+                    color: isDark ? Colors.white54 : Colors.grey),
                 onTap: () => _showInviteDialog(isDark),
               ),
               const Divider(height: 1),
 
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text('Logout', style: TextStyle(color: Colors.red)),
+                title:
+                    const Text('Logout', style: TextStyle(color: Colors.red)),
                 onTap: () => _logout(),
               ),
               const Divider(height: 1),
 
               ListTile(
                 leading: const Icon(Icons.delete_forever, color: Colors.red),
-                title: const Text('Delete Account', style: TextStyle(color: Colors.red)),
+                title: const Text('Delete Account',
+                    style: TextStyle(color: Colors.red)),
                 onTap: () => _deleteAccount(),
               ),
 
               const SizedBox(height: 32),
-              
+
               // App Version
               Center(
                 child: Text(
@@ -279,12 +364,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       children: [
         ListTile(
-          leading: Icon(icon, color: iconColor ?? (isDark ? Colors.white70 : RegentColors.blue)),
-          title: Text(title, style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
-          subtitle: subtitle != null 
-              ? Text(subtitle, style: TextStyle(color: isDark ? Colors.white54 : Colors.grey))
+          leading: Icon(icon,
+              color:
+                  iconColor ?? (isDark ? Colors.white70 : RegentColors.blue)),
+          title: Text(title,
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+          subtitle: subtitle != null
+              ? Text(subtitle,
+                  style:
+                      TextStyle(color: isDark ? Colors.white54 : Colors.grey))
               : null,
-          trailing: Icon(Icons.chevron_right, color: isDark ? Colors.white54 : Colors.grey),
+          trailing: Icon(Icons.chevron_right,
+              color: isDark ? Colors.white54 : Colors.grey),
           onTap: onTap,
         ),
         const Divider(height: 1),
@@ -294,8 +385,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _changeProfilePicture() async {
     final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
-    
+    final image =
+        await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+
     if (image == null) return;
 
     showDialog(
@@ -307,12 +399,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final bytes = await image.readAsBytes();
       final odId = authService.currentUser!.uid;
-      final ref = _storage.ref().child('profile_pictures/$odId.jpg');
-      
-      await ref.putData(bytes);
+      final ref = _storage.ref().child(
+          'profile_pictures/$odId/profile_${DateTime.now().millisecondsSinceEpoch}.jpg');
+
+      await ref.putData(
+        bytes,
+        SettableMetadata(
+          contentType: image.mimeType ?? 'image/jpeg',
+          customMetadata: {'ownerUid': odId},
+        ),
+      );
       final url = await ref.getDownloadURL();
 
-      await _firestore.collection('users').doc(odId).update({'photoUrl': url});
+      await _firestore.collection('users').doc(odId).update({
+        'photoUrl': url,
+        'photoStoragePath': ref.fullPath,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
       await authService.currentUser!.updatePhotoURL(url);
 
       if (mounted) Navigator.pop(context);
@@ -328,13 +431,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _editDisplayName(String? currentName) {
     final controller = TextEditingController(text: currentName);
-    final isDark = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
-    
+    final isDark =
+        Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF2D2D2D) : Colors.white,
-        title: Text('Edit Display Name', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+        backgroundColor: isDark ? RegentColors.darkCard : Colors.white,
+        title: Text('Edit Display Name',
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
         content: TextField(
           controller: controller,
           style: TextStyle(color: isDark ? Colors.white : Colors.black87),
@@ -367,13 +472,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _editProgram(String? currentProgram) {
     final controller = TextEditingController(text: currentProgram);
-    final isDark = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
-    
+    final isDark =
+        Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF2D2D2D) : Colors.white,
-        title: Text('Edit Program', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+        backgroundColor: isDark ? RegentColors.darkCard : Colors.white,
+        title: Text('Edit Program',
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
         content: TextField(
           controller: controller,
           style: TextStyle(color: isDark ? Colors.white : Colors.black87),
@@ -405,19 +512,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _editLevel(int? currentLevel) {
     int selected = currentLevel ?? 100;
-    final isDark = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
-    
+    final isDark =
+        Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF2D2D2D) : Colors.white,
-          title: Text('Select Level', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+          backgroundColor: isDark ? RegentColors.darkCard : Colors.white,
+          title: Text('Select Level',
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [100, 200, 300, 400].map((level) {
               return RadioListTile<int>(
-                title: Text('Level $level', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+                title: Text('Level $level',
+                    style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87)),
                 value: level,
                 groupValue: selected,
                 onChanged: (value) => setState(() => selected = value!),
@@ -444,13 +555,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _editAbout(String? currentAbout) {
     final controller = TextEditingController(text: currentAbout);
-    final isDark = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
-    
+    final isDark =
+        Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF2D2D2D) : Colors.white,
-        title: Text('Edit About', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+        backgroundColor: isDark ? RegentColors.darkCard : Colors.white,
+        title: Text('Edit About',
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
         content: TextField(
           controller: controller,
           maxLines: 3,
@@ -489,13 +602,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _changePassword() {
     final email = authService.currentUser?.email;
     if (email == null) return;
-    final isDark = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+    final isDark =
+        Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF2D2D2D) : Colors.white,
-        title: Text('Change Password', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+        backgroundColor: isDark ? RegentColors.darkCard : Colors.white,
+        title: Text('Change Password',
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
         content: Text(
           'We will send a password reset link to your email.',
           style: TextStyle(color: isDark ? Colors.white70 : Colors.grey),
@@ -523,28 +638,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _logout() {
-    final isDark = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
-    
+    final isDark =
+        Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+    final pageContext = context;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF2D2D2D) : Colors.white,
-        title: Text('Logout', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? RegentColors.darkCard : Colors.white,
+        title: Text('Logout',
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
         content: Text(
           'Are you sure you want to logout?',
           style: TextStyle(color: isDark ? Colors.white70 : Colors.grey),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () =>
+                Navigator.of(dialogContext, rootNavigator: true).pop(),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
-              await authService.signOut();
-              if (mounted) {
-                Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+              Navigator.of(dialogContext, rootNavigator: true).pop();
+              try {
+                debugPrint('Logout confirmed from settings screen');
+                await authService.signOut();
+                debugPrint('Logout completed');
+                if (!mounted) return;
+                Navigator.of(pageContext, rootNavigator: true)
+                    .pushNamedAndRemoveUntil('/login', (route) => false);
+              } catch (error) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(pageContext).showSnackBar(
+                  SnackBar(content: Text('Logout failed: $error')),
+                );
               }
             },
             child: const Text('Logout', style: TextStyle(color: Colors.white)),
@@ -555,35 +684,102 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _deleteAccount() {
-    final isDark = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
-    
+    final isDark =
+        Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+    final pageContext = context;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF2D2D2D) : Colors.white,
-        title: Text('Delete Account', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? RegentColors.darkCard : Colors.white,
+        title: Text('Delete Account',
+            style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
         content: Text(
           'This action cannot be undone. All your data will be permanently deleted.',
           style: TextStyle(color: isDark ? Colors.white70 : Colors.grey),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () =>
+                Navigator.of(dialogContext, rootNavigator: true).pop(),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Feature coming soon')),
-              );
+              Navigator.of(dialogContext, rootNavigator: true).pop();
+              debugPrint('Delete account confirmed from settings screen');
+              await _performAccountDeletion(pageContext);
             },
             child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _performAccountDeletion(BuildContext pageContext) async {
+    final user = authService.currentUser;
+    if (user == null) return;
+
+    try {
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final userData = userDoc.data() ?? {};
+      final photoPath = userData['photoStoragePath']?.toString();
+      final isOfficial = userData['isOfficial'] == true ||
+          userData['officialAccountId'] != null;
+      final officialAccountId = userData['officialAccountId']?.toString();
+
+      if (photoPath != null && photoPath.isNotEmpty) {
+        try {
+          await _storage.ref().child(photoPath).delete();
+        } catch (error) {
+          debugPrint('Photo delete skipped: $error');
+        }
+      }
+
+      if (isOfficial && officialAccountId != null && officialAccountId.isNotEmpty) {
+        try {
+          await _firestore.collection('official_offices').doc(officialAccountId).delete();
+        } catch (error) {
+          debugPrint('Official office delete skipped: $error');
+        }
+      }
+
+      try {
+        await _firestore.collection('users').doc(user.uid).delete();
+      } catch (error) {
+        debugPrint('User profile delete skipped: $error');
+      }
+
+      await user.delete();
+
+      if (!mounted) return;
+      await authService.signOut();
+      if (!mounted) return;
+      Navigator.of(pageContext, rootNavigator: true)
+          .pushNamedAndRemoveUntil('/login', (route) => false);
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) return;
+      if (error.code == 'requires-recent-login') {
+        ScaffoldMessenger.of(pageContext).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Please log out and sign in again, then try deleting the account.',
+            ),
+          ),
+        );
+        return;
+      }
+      ScaffoldMessenger.of(pageContext).showSnackBar(
+        SnackBar(content: Text('Delete failed: ${error.message ?? error.code}')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(pageContext).showSnackBar(
+        SnackBar(content: Text('Delete failed: $error')),
+      );
+    }
   }
 
   void _showInviteDialog(bool isDark) {
@@ -608,7 +804,7 @@ Let's connect and grow together! 🚀''';
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF2D2D2D) : Colors.white,
+        backgroundColor: isDark ? RegentColors.darkCard : Colors.white,
         title: Text(
           'Invite Friends',
           style: TextStyle(color: isDark ? Colors.white : Colors.black87),

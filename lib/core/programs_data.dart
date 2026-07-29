@@ -34,38 +34,50 @@ class FacultyData {
   });
 }
 
-// University Programs Data
+// Regent University undergraduate schools and programmes.
+//
+// The public site clearly surfaces the programme titles, while the full
+// semester-by-semester module lists live in curriculum documents and the
+// student handbook. The app keeps the structure here so those modules can be
+// filled in cleanly when the official curriculum PDFs are imported.
 final List<FacultyData> universityFaculties = [
-  // Faculty of Engineering, Computing and Allied Science (FECAS)
   FacultyData(
-    name: 'Faculty of Engineering, Computing and Allied Science (FECAS)',
+    name: 'School of Engineering, Computing and Allied Sciences',
     programs: [
       ProgramData(
-        name: 'BSc. (Hons) Computer Science',
-        courses: [], // Will be populated when you provide courses
-      ),
-      ProgramData(
-        name: 'BSc. (Hons) Information Technology',
+        name: 'BSc. Information Technology',
         courses: [],
       ),
       ProgramData(
-        name: 'BEng. (Hons) Applied Electronics and Systems Engineering',
-        options: [
-          'Computer Engineering',
-          'Instrumentation Engineering',
-          'Telecommunication Engineering',
+        name: 'BSc. Computer Science',
+        courses: [],
+      ),
+      ProgramData(
+        name: 'BEng. Computer Engineering',
+        courses: [],
+      ),
+      ProgramData(
+        name: 'BEng. Applied Electronics and Systems Engineering',
+        options: const [
+          'Telecommunication Option',
         ],
+        courses: [],
+      ),
+      ProgramData(
+        name: 'BSc. Information Systems Sciences',
         courses: [],
       ),
     ],
   ),
-
-  // School of Business, Leadership and Legal Studies
   FacultyData(
     name: 'School of Business, Leadership and Legal Studies',
     programs: [
       ProgramData(
-        name: 'BSc. (Hons) Accounting and Information Systems',
+        name: 'BSc. Accounting with Information Systems',
+        courses: [],
+      ),
+      ProgramData(
+        name: 'BSc. Banking and Finance',
         courses: [],
       ),
       ProgramData(
@@ -73,22 +85,52 @@ final List<FacultyData> universityFaculties = [
         courses: [],
       ),
       ProgramData(
-        name: 'BSc. (Hons) Management with Computing',
-        options: [
+        name: 'BSc. Economics with Computing',
+        courses: [],
+      ),
+      ProgramData(
+        name: 'BSc. Management with Computing',
+        options: const [
           'Marketing Management',
           'Human Resource Management',
         ],
         courses: [],
       ),
+      ProgramData(
+        name: 'BSc. Marketing',
+        courses: [],
+      ),
+      ProgramData(
+        name: 'BSc. Human Resource Management',
+        courses: [],
+      ),
+      ProgramData(
+        name: 'BSc. Procurement and Supply Chain Management',
+        courses: [],
+      ),
+      ProgramData(
+        name: 'Law-related programmes',
+        courses: [],
+      ),
     ],
   ),
-
-  // Faculty of Arts and Sciences
   FacultyData(
     name: 'Faculty of Arts and Sciences',
     programs: [
       ProgramData(
-        name: 'BSc. (Hons) Psychology',
+        name: 'BSc. Psychology and Human Development',
+        courses: [],
+      ),
+      ProgramData(
+        name: 'BSc. Statistics',
+        courses: [],
+      ),
+      ProgramData(
+        name: 'Sustainability-related programmes',
+        courses: [],
+      ),
+      ProgramData(
+        name: 'Other social science programmes',
         courses: [],
       ),
       ProgramData(
@@ -98,45 +140,24 @@ final List<FacultyData> universityFaculties = [
     ],
   ),
   FacultyData(
-    name: 'Faculty of Science',
+    name: 'School of Theology and Ministry',
     programs: [
-      ProgramData(name: 'Information Technology', courses: []),
-      ProgramData(name: 'Software Engineering', courses: []),
-      ProgramData(name: 'Computer Science', courses: []),
-      ProgramData(name: 'Electrical Engineering', courses: []),
-      ProgramData(name: 'Mechanical Engineering', courses: []),
-      ProgramData(name: 'Civil Engineering', courses: []),
-      ProgramData(name: 'Mathematics', courses: []),
-      ProgramData(name: 'Physics', courses: []),
-      ProgramData(name: 'Chemistry', courses: []),
-    ],
-  ),
-  FacultyData(
-    name: 'Faculty of Business',
-    programs: [
-      ProgramData(name: 'Business Administration', courses: []),
-      ProgramData(name: 'Accounting', courses: []),
-      ProgramData(name: 'Economics', courses: []),
-      ProgramData(name: 'Finance', courses: []),
-      ProgramData(name: 'Marketing', courses: []),
-      ProgramData(name: 'Human Resources', courses: []),
-    ],
-  ),
-  FacultyData(
-    name: 'Faculty of Arts',
-    programs: [
-      ProgramData(name: 'English', courses: []),
-      ProgramData(name: 'History', courses: []),
-      ProgramData(name: 'Philosophy', courses: []),
-      ProgramData(name: 'Psychology', courses: []),
-      ProgramData(name: 'Sociology', courses: []),
-    ],
-  ),
-  FacultyData(
-    name: 'Faculty of Law',
-    programs: [
-      ProgramData(name: 'Law', courses: []),
-      ProgramData(name: 'Criminal Justice', courses: []),
+      ProgramData(
+        name: 'Bachelor of Theology',
+        courses: [],
+      ),
+      ProgramData(
+        name: 'Ministry programmes',
+        courses: [],
+      ),
+      ProgramData(
+        name: 'Pentecostal Studies',
+        courses: [],
+      ),
+      ProgramData(
+        name: 'Graduate Theology programmes',
+        courses: [],
+      ),
     ],
   ),
 ];

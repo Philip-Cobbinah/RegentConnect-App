@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
@@ -17,7 +16,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _nameController = TextEditingController();
   final _bioController = TextEditingController();
   final _phoneController = TextEditingController();
-  
+
   bool _isLoading = false;
   bool _isUploading = false;
 
@@ -43,7 +42,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isUploading = true);
 
     try {
-      final url = await _userService.uploadProfilePicture(File(image.path));
+      final url = await _userService.uploadProfilePictureBytes(
+        await image.readAsBytes(),
+        contentType: image.mimeType ?? 'image/jpeg',
+      );
       if (url != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -62,7 +64,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
     } finally {
-      setState(() => _isUploading = false);
+      if (mounted) setState(() => _isUploading = false);
     }
   }
 
@@ -122,7 +124,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Icon(icon, color: Colors.white, size: 26),
           ),
           const SizedBox(height: 8),
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          Text(label,
+              style: const TextStyle(color: Colors.white70, fontSize: 12)),
         ],
       ),
     );
@@ -155,9 +158,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isLoading = true);
     try {
       await _userService.updateProfile(
-        fullName: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null,
-        bio: _bioController.text.trim().isNotEmpty ? _bioController.text.trim() : null,
-        phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+        fullName: _nameController.text.trim().isNotEmpty
+            ? _nameController.text.trim()
+            : null,
+        bio: _bioController.text.trim().isNotEmpty
+            ? _bioController.text.trim()
+            : null,
+        phone: _phoneController.text.trim().isNotEmpty
+            ? _phoneController.text.trim()
+            : null,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -184,7 +193,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: RegentColors.dmBackground,
       appBar: AppBar(
         backgroundColor: RegentColors.dmSurface,
-        title: const Text('Edit Profile', style: TextStyle(color: Colors.white)),
+        title:
+            const Text('Edit Profile', style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -196,9 +206,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2),
                   )
-                : const Text('Save', style: TextStyle(color: RegentColors.violet)),
+                : const Text('Save',
+                    style: TextStyle(color: RegentColors.violet)),
           ),
         ],
       ),
@@ -206,11 +218,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         stream: _userService.getCurrentUserStream(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator(color: RegentColors.violet));
+            return const Center(
+                child: CircularProgressIndicator(color: RegentColors.violet));
           }
 
           final userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
-          
+
           // Initialize controllers with current data
           if (_nameController.text.isEmpty && userData['fullName'] != null) {
             _nameController.text = userData['fullName'];
@@ -238,10 +251,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ? NetworkImage(userData['photoUrl'])
                             : null,
                         child: _isUploading
-                            ? const CircularProgressIndicator(color: Colors.white)
+                            ? const CircularProgressIndicator(
+                                color: Colors.white)
                             : userData['photoUrl'] == null
                                 ? Text(
-                                    (userData['fullName'] ?? userData['email'] ?? 'U')[0].toUpperCase(),
+                                    (userData['fullName'] ??
+                                            userData['email'] ??
+                                            'U')[0]
+                                        .toUpperCase(),
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 40,
@@ -261,9 +278,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           decoration: BoxDecoration(
                             color: RegentColors.violet,
                             shape: BoxShape.circle,
-                            border: Border.all(color: RegentColors.dmBackground, width: 3),
+                            border: Border.all(
+                                color: RegentColors.dmBackground, width: 3),
                           ),
-                          child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                          child: const Icon(Icons.camera_alt,
+                              color: Colors.white, size: 20),
                         ),
                       ),
                     ),
@@ -275,7 +294,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: const TextStyle(color: Colors.white54),
                 ),
                 const SizedBox(height: 30),
-                
+
                 // Name field
                 _buildTextField(
                   controller: _nameController,
@@ -283,7 +302,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   icon: Icons.person,
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Bio field
                 _buildTextField(
                   controller: _bioController,
@@ -292,7 +311,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   maxLines: 3,
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Phone field
                 _buildTextField(
                   controller: _phoneController,
@@ -301,14 +320,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   keyboardType: TextInputType.phone,
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Program (read-only)
                 if (userData['program'] != null)
                   _buildInfoTile('Program', userData['program'], Icons.school),
-                
+
                 // Level (read-only)
                 if (userData['level'] != null)
                   _buildInfoTile('Level', userData['level'], Icons.layers),
+
+                // Session (read-only)
+                if (userData['session'] != null)
+                  _buildInfoTile(
+                    'Session',
+                    userData['session'].toString(),
+                    Icons.schedule,
+                  ),
               ],
             ),
           );
@@ -362,8 +389,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-              Text(value, style: const TextStyle(color: Colors.white, fontSize: 16)),
+              Text(label,
+                  style: const TextStyle(color: Colors.white54, fontSize: 12)),
+              Text(value,
+                  style: const TextStyle(color: Colors.white, fontSize: 16)),
             ],
           ),
         ],

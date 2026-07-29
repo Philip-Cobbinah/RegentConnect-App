@@ -11,7 +11,12 @@ import '../../../models/group_model.dart';
 import '../../../services/auth_service.dart';
 
 class CreateGroupScreen extends StatefulWidget {
-  const CreateGroupScreen({super.key});
+  final String initialKind;
+
+  const CreateGroupScreen({
+    super.key,
+    this.initialKind = 'group',
+  });
 
   @override
   State<CreateGroupScreen> createState() => _CreateGroupScreenState();
@@ -27,6 +32,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   Uint8List? _groupProfileImage;
   final Set<String> _selectedMembers = {};
   bool _isCreating = false;
+  late String _kind;
+
+  @override
+  void initState() {
+    super.initState();
+    _kind = widget.initialKind == 'channel' ? 'channel' : 'group';
+  }
 
   @override
   void dispose() {
@@ -37,8 +49,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   Future<void> _pickGroupImage() async {
     final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
-    
+    final image =
+        await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+
     if (image != null) {
       final bytes = await image.readAsBytes();
       setState(() => _groupProfileImage = bytes);
@@ -48,7 +61,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   Future<void> _createGroup() async {
     if (_groupNameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a group name')),
+        SnackBar(content: Text('Please enter a $_kind name')),
       );
       return;
     }
@@ -67,35 +80,66 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       final groupId = DateTime.now().millisecondsSinceEpoch.toString();
       String? profileUrl;
 
-      // Upload group profile picture if selected
-      if (_groupProfileImage != null) {
-        final ref = _storage.ref().child('group_profiles/$groupId.jpg');
-        await ref.putData(_groupProfileImage!);
-        profileUrl = await ref.getDownloadURL();
-      }
-
       // Add current user to members
       final members = [..._selectedMembers, currentUser!.uid];
 
-      // Create group
+      final creatorDocument =
+          await _firestore.collection('users').doc(currentUser.uid).get();
+      final creatorData = creatorDocument.data() ?? <String, dynamic>{};
+
+      // Create group or channel
       final group = GroupModel(
         id: groupId,
         name: _groupNameController.text.trim(),
         profilePictureUrl: profileUrl,
         createdBy: currentUser.uid,
-        creatorName: currentUser.displayName ?? 'Unknown',
+        creatorName: creatorData['fullName'] ??
+            creatorData['displayName'] ??
+            currentUser.displayName ??
+            currentUser.email ??
+            'Unknown',
         creatorPhotoUrl: currentUser.photoURL,
         createdAt: DateTime.now(),
         members: members,
+        admins: [currentUser.uid],
         description: _descriptionController.text.trim(),
+        inviteLink: 'https://regent-connect-85439.web.app/$_kind/$groupId',
+        kind: _kind,
+        allowMemberStatusTagging: true,
+        membersCanPost: _kind != 'channel',
       );
 
       await _firestore.collection('groups').doc(groupId).set(group.toMap());
 
+      // The group must exist before Storage rules permit an admin upload.
+      if (_groupProfileImage != null) {
+        final ref = _storage
+            .ref()
+            .child('group_profiles/$groupId/${currentUser.uid}/profile.jpg');
+        await ref.putData(
+          _groupProfileImage!,
+          SettableMetadata(
+            contentType: 'image/jpeg',
+            customMetadata: {
+              'groupId': groupId,
+              'uploaderUid': currentUser.uid,
+            },
+          ),
+        );
+        profileUrl = await ref.getDownloadURL();
+        await _firestore.collection('groups').doc(groupId).update({
+          'profilePictureUrl': profileUrl,
+          'profileStoragePath': ref.fullPath,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Group created successfully!'),
+          SnackBar(
+            content: Text(
+              '${_kind == 'channel' ? 'Channel' : 'Group'} created successfully!',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -117,16 +161,22 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
-    
-    final gradientColor1 = isDark 
-        ? const Color(0xFF1A1A2E) 
-        : const Color(0xFF4A148C);
+
+    final gradientColor1 =
+        isDark ? RegentColors.darkBackground : RegentColors.primaryDark;
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: gradientColor1,
         elevation: 0,
-        title: const Text('Create Group', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+        title: Text(
+          'Create ${_kind == 'channel' ? 'Channel' : 'Group'}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Column(
@@ -137,6 +187,32 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                        value: 'group',
+                        icon: Icon(Icons.groups_2),
+                        label: Text('Group'),
+                      ),
+                      ButtonSegment(
+                        value: 'channel',
+                        icon: Icon(Icons.campaign),
+                        label: Text('Channel'),
+                      ),
+                    ],
+                    selected: {_kind},
+                    onSelectionChanged: (selection) {
+                      setState(() => _kind = selection.first);
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    _kind == 'channel'
+                        ? 'Channel admins publish updates; members read and respond through polls.'
+                        : 'Group members can chat together and tag the group in statuses.',
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 24),
                   // Group Profile Picture
                   Center(
                     child: GestureDetector(
@@ -147,12 +223,14 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: Colors.grey[300],
-                          border: Border.all(color: RegentColors.blue, width: 2),
+                          border:
+                              Border.all(color: RegentColors.blue, width: 2),
                         ),
                         child: _groupProfileImage != null
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(50),
-                                child: Image.memory(_groupProfileImage!, fit: BoxFit.cover),
+                                child: Image.memory(_groupProfileImage!,
+                                    fit: BoxFit.cover),
                               )
                             : Icon(
                                 Icons.camera_alt,
@@ -168,8 +246,10 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   TextField(
                     controller: _groupNameController,
                     decoration: InputDecoration(
-                      labelText: 'Group Name',
-                      hintText: 'Enter group name',
+                      labelText:
+                          _kind == 'channel' ? 'Channel Name' : 'Group Name',
+                      hintText:
+                          'Enter ${_kind == 'channel' ? 'channel' : 'group'} name',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -206,15 +286,18 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
                   // Members List
                   StreamBuilder<QuerySnapshot>(
-                    stream: _firestore.collection('users')
-                        .where('uid', isNotEqualTo: authService.currentUser?.uid)
-                        .snapshots(),
+                    stream: _firestore.collection('users').snapshots(),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) {
                         return const Center(child: CircularProgressIndicator());
                       }
 
-                      final users = snapshot.data!.docs;
+                      final users = snapshot.data!.docs
+                          .where(
+                            (document) =>
+                                document.id != authService.currentUser?.uid,
+                          )
+                          .toList();
 
                       return ListView.builder(
                         shrinkWrap: true,
@@ -231,10 +314,20 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                                   ? NetworkImage(userData['photoUrl'])
                                   : null,
                               child: userData['photoUrl'] == null
-                                  ? Text(userData['displayName']?[0]?.toUpperCase() ?? '?')
+                                  ? Text(
+                                      ((userData['fullName'] ??
+                                                  userData['displayName'] ??
+                                                  'U')
+                                              .toString())[0]
+                                          .toUpperCase(),
+                                    )
                                   : null,
                             ),
-                            title: Text(userData['displayName'] ?? 'Unknown'),
+                            title: Text(
+                              userData['fullName'] ??
+                                  userData['displayName'] ??
+                                  'Unknown',
+                            ),
                             subtitle: Text(userData['program'] ?? ''),
                             trailing: Checkbox(
                               value: isSelected,
@@ -287,8 +380,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                           color: Colors.white,
                         ),
                       )
-                    : const Text(
-                        'Create Group',
+                    : Text(
+                        'Create ${_kind == 'channel' ? 'Channel' : 'Group'}',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
