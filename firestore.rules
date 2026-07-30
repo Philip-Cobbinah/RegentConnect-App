@@ -414,6 +414,58 @@ service cloud.firestore {
         );
     }
 
+    match /academic_results/{resultId} {
+      allow read: if signedIn() &&
+        (
+          resource.data.studentId == request.auth.uid ||
+          isOfficialEmail() ||
+          isAdmin()
+        );
+      allow create, update: if signedIn() &&
+        (
+          isOfficialEmail() ||
+          isAdmin()
+        ) &&
+        request.resource.data.studentId is string;
+      allow delete: if signedIn() &&
+        (
+          isOfficialEmail() ||
+          isAdmin()
+        );
+    }
+
+    match /course_registrations/{registrationId} {
+      allow read: if signedIn() &&
+        (
+          resource.data.studentUid == request.auth.uid ||
+          isOfficialEmail() ||
+          isAdmin()
+        );
+      allow create: if signedIn() &&
+        request.resource.data.studentUid == request.auth.uid &&
+        request.resource.data.studentId is string &&
+        request.resource.data.fullName is string &&
+        request.resource.data.level is int &&
+        request.resource.data.term is int &&
+        request.resource.data.termLabel is string &&
+        request.resource.data.facultyName is string &&
+        request.resource.data.programName is string &&
+        request.resource.data.registrationDate is timestamp;
+      allow update: if signedIn() &&
+        (
+          resource.data.studentUid == request.auth.uid ||
+          isOfficialEmail() ||
+          isAdmin()
+        ) &&
+        request.resource.data.studentUid == resource.data.studentUid;
+      allow delete: if signedIn() &&
+        (
+          resource.data.studentUid == request.auth.uid ||
+          isOfficialEmail() ||
+          isAdmin()
+        );
+    }
+
     match /streaks/{streakId} {
       allow read: if signedIn();
       allow create: if signedIn() &&

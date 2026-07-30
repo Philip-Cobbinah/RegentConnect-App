@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../../core/theme.dart';
 import '../../../models/past_question_model.dart';
 import '../../../services/past_questions_service.dart';
@@ -11,6 +12,8 @@ class ViewPastQuestionsScreen extends StatefulWidget {
   final String? option;
   final int level;
   final int semester;
+  final String termLabel;
+  final String? courseTitleQuery;
 
   const ViewPastQuestionsScreen({
     super.key,
@@ -19,29 +22,36 @@ class ViewPastQuestionsScreen extends StatefulWidget {
     this.option,
     required this.level,
     required this.semester,
+    this.termLabel = 'Semester',
+    this.courseTitleQuery,
   });
 
   @override
-  State<ViewPastQuestionsScreen> createState() => _ViewPastQuestionsScreenState();
+  State<ViewPastQuestionsScreen> createState() =>
+      _ViewPastQuestionsScreenState();
 }
 
 class _ViewPastQuestionsScreenState extends State<ViewPastQuestionsScreen> {
   int? selectedYear;
-  final List<int> years = List.generate(11, (index) => 2025 - index); // 2025-2015
+  final List<int> years = List.generate(12, (index) => DateTime.now().year - index);
   final pastQuestionsService = PastQuestionsService();
   final authService = AuthService();
 
   @override
   Widget build(BuildContext context) {
+    final query = widget.courseTitleQuery?.trim() ?? '';
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: RegentColors.blue,
-        title: const Text('Past Questions', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Past Questions',
+          style: TextStyle(color: Colors.white),
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Column(
         children: [
-          // Filter Card
           Container(
             padding: const EdgeInsets.all(16),
             color: Colors.grey[100],
@@ -53,28 +63,36 @@ class _ViewPastQuestionsScreenState extends State<ViewPastQuestionsScreen> {
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  'Level ${widget.level} • Semester ${widget.semester}',
+                  'Level ${widget.level} • ${widget.termLabel} ${widget.semester}',
                   style: const TextStyle(color: Colors.grey),
                 ),
+                if (query.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Search: $query',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int?>(
-                  initialValue: selectedYear,
+                  value: selectedYear,
                   decoration: const InputDecoration(
                     labelText: 'Filter by Year',
                     border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                   items: [
                     const DropdownMenuItem<int?>(
                       value: null,
                       child: Text('All Years'),
                     ),
-                    ...years.map((year) {
-                      return DropdownMenuItem<int?>(
+                    ...years.map(
+                      (year) => DropdownMenuItem<int?>(
                         value: year,
                         child: Text('$year'),
-                      );
-                    }),
+                      ),
+                    ),
                   ],
                   onChanged: (value) {
                     setState(() => selectedYear = value);
@@ -83,14 +101,14 @@ class _ViewPastQuestionsScreenState extends State<ViewPastQuestionsScreen> {
               ],
             ),
           ),
-
-          // Questions List
           Expanded(
             child: StreamBuilder<List<PastQuestionModel>>(
-              stream: pastQuestionsService.getPastQuestionsByProgram(
+              stream: pastQuestionsService.watchPastQuestions(
+                facultyName: widget.facultyName,
                 programName: widget.programName,
                 level: widget.level,
                 semester: widget.semester,
+                query: query,
               ),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -102,7 +120,8 @@ class _ViewPastQuestionsScreenState extends State<ViewPastQuestionsScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.folder_open, size: 64, color: Colors.grey),
+                        Icon(Icons.folder_open,
+                            size: 64, color: Colors.grey),
                         SizedBox(height: 16),
                         Text('No past questions found'),
                         SizedBox(height: 8),
@@ -116,10 +135,10 @@ class _ViewPastQuestionsScreenState extends State<ViewPastQuestionsScreen> {
                 }
 
                 var questions = snapshot.data!;
-                
-                // Filter by year if selected
                 if (selectedYear != null) {
-                  questions = questions.where((q) => q.year == selectedYear).toList();
+                  questions = questions
+                      .where((question) => question.year == selectedYear)
+                      .toList();
                 }
 
                 if (questions.isEmpty) {
@@ -128,11 +147,10 @@ class _ViewPastQuestionsScreenState extends State<ViewPastQuestionsScreen> {
                   );
                 }
 
-                // Group by course
                 final groupedQuestions = <String, List<PastQuestionModel>>{};
-                for (var q in questions) {
-                  final key = '${q.courseCode} - ${q.courseName}';
-                  groupedQuestions.putIfAbsent(key, () => []).add(q);
+                for (final question in questions) {
+                  final key = '${question.courseCode} - ${question.courseName}';
+                  groupedQuestions.putIfAbsent(key, () => []).add(question);
                 }
 
                 return ListView.builder(
@@ -141,7 +159,6 @@ class _ViewPastQuestionsScreenState extends State<ViewPastQuestionsScreen> {
                   itemBuilder: (context, index) {
                     final courseKey = groupedQuestions.keys.elementAt(index);
                     final courseQuestions = groupedQuestions[courseKey]!;
-                    
                     return _buildCourseCard(courseKey, courseQuestions);
                   },
                 );
@@ -163,9 +180,7 @@ class _ViewPastQuestionsScreenState extends State<ViewPastQuestionsScreen> {
         ),
         subtitle: Text('${questions.length} past question(s)'),
         leading: const Icon(Icons.book, color: RegentColors.blue),
-        children: questions.map((question) {
-          return _buildQuestionTile(question);
-        }).toList(),
+        children: questions.map(_buildQuestionTile).toList(),
       ),
     );
   }
@@ -201,19 +216,16 @@ class _ViewPastQuestionsScreenState extends State<ViewPastQuestionsScreen> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Download button
           IconButton(
             icon: const Icon(Icons.download, color: RegentColors.green),
             tooltip: 'Download',
             onPressed: () => _downloadFile(question),
           ),
-          // View button
           IconButton(
             icon: const Icon(Icons.visibility, color: RegentColors.blue),
             tooltip: 'View',
             onPressed: () => _viewFile(question),
           ),
-          // Delete button (only for owner)
           if (isOwner)
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
@@ -226,10 +238,11 @@ class _ViewPastQuestionsScreenState extends State<ViewPastQuestionsScreen> {
   }
 
   Widget _getFileIcon(String fileType) {
+    final lower = fileType.toLowerCase();
     IconData icon;
     Color color;
-    
-    switch (fileType.toLowerCase()) {
+
+    switch (lower) {
       case 'pdf':
         icon = Icons.picture_as_pdf;
         color = Colors.red;
@@ -249,7 +262,7 @@ class _ViewPastQuestionsScreenState extends State<ViewPastQuestionsScreen> {
         icon = Icons.insert_drive_file;
         color = Colors.grey;
     }
-    
+
     return Icon(icon, color: color);
   }
 
@@ -262,10 +275,10 @@ class _ViewPastQuestionsScreenState extends State<ViewPastQuestionsScreen> {
       } else {
         throw Exception('Cannot open file');
       }
-    } catch (e) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error downloading: $e')),
+          SnackBar(content: Text('Error downloading: $error')),
         );
       }
     }
@@ -279,10 +292,10 @@ class _ViewPastQuestionsScreenState extends State<ViewPastQuestionsScreen> {
       } else {
         throw Exception('Cannot open file');
       }
-    } catch (e) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error viewing: $e')),
+          SnackBar(content: Text('Error viewing: $error')),
         );
       }
     }
@@ -293,7 +306,8 @@ class _ViewPastQuestionsScreenState extends State<ViewPastQuestionsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Past Question'),
-        content: const Text('Are you sure you want to delete this past question?'),
+        content:
+            const Text('Are you sure you want to delete this past question?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),

@@ -106,24 +106,72 @@ class PastQuestionsService {
     });
   }
 
+  Stream<List<PastQuestionModel>> watchPastQuestions({
+    String? facultyName,
+    String? programName,
+    int? level,
+    int? semester,
+    int? year,
+    String? query,
+  }) {
+    Query queryRef = _firestore.collection(_collection);
+
+    if (facultyName != null && facultyName.trim().isNotEmpty) {
+      queryRef = queryRef.where('facultyName', isEqualTo: facultyName.trim());
+    }
+    if (programName != null && programName.trim().isNotEmpty) {
+      queryRef = queryRef.where('programName', isEqualTo: programName.trim());
+    }
+    if (level != null) {
+      queryRef = queryRef.where('level', isEqualTo: level);
+    }
+    if (semester != null) {
+      queryRef = queryRef.where('semester', isEqualTo: semester);
+    }
+    if (year != null) {
+      queryRef = queryRef.where('year', isEqualTo: year);
+    }
+
+    return queryRef.snapshots().map((snapshot) {
+      final normalizedQuery = query?.trim().toLowerCase() ?? '';
+      final items = snapshot.docs
+          .map((doc) => PastQuestionModel.fromMap(
+                doc.data() as Map<String, dynamic>,
+                doc.id,
+              ))
+          .where((question) {
+        if (normalizedQuery.isEmpty) return true;
+        return [
+          question.courseCode,
+          question.courseName,
+          question.fileName,
+          question.programName,
+          question.facultyName,
+        ].whereType<String>().any(
+              (value) => value.toLowerCase().contains(normalizedQuery),
+            );
+      }).toList();
+
+      items.sort((a, b) {
+        final yearCompare = b.year.compareTo(a.year);
+        if (yearCompare != 0) return yearCompare;
+        return b.uploadedAt.compareTo(a.uploadedAt);
+      });
+      return items;
+    });
+  }
+
   // Get all past questions for a program/level/semester
   Stream<List<PastQuestionModel>> getPastQuestionsByProgram({
     required String programName,
     required int level,
     required int semester,
   }) {
-    return _firestore
-        .collection(_collection)
-        .where('programName', isEqualTo: programName)
-        .where('level', isEqualTo: level)
-        .where('semester', isEqualTo: semester)
-        .orderBy('year', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        return PastQuestionModel.fromMap(doc.data(), doc.id);
-      }).toList();
-    });
+    return watchPastQuestions(
+      programName: programName,
+      level: level,
+      semester: semester,
+    );
   }
 
   // Delete past question

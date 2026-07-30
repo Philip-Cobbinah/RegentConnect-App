@@ -7,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme.dart';
 import '../../../features/chat/widgets/chat_media_viewer.dart';
+import 'course_registration_screen.dart';
+import 'academic_portal_screens.dart';
 import '../../../models/academic_post_model.dart';
 import '../../../services/academic_service.dart';
 import 'academic_post_editor_screen.dart';
@@ -142,102 +144,105 @@ class _AcademicsTabState extends State<AcademicsTab>
               return remaining >= 0 && remaining <= 7;
             }).length;
 
-            return Column(
-              children: [
-                _buildHero(
-                  context,
-                  userName: currentName,
-                  currentLevel: currentLevel,
-                  currentProgram: currentProgram,
-                  currentSession: currentSession,
-                  visibleCount: visiblePosts.length,
-                  assignmentCount: assignmentPosts.length,
-                  lectureCount: lecturePosts.length,
-                  dueSoonCount: dueSoonCount,
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _buildSearchBar(),
-                ),
-                const SizedBox(height: 10),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: TabBar(
-                    controller: _tabController,
-                    isScrollable: true,
-                    labelColor: RegentColors.violet,
-                    unselectedLabelColor:
-                        Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white60
-                            : Colors.black54,
-                    indicatorColor: RegentColors.violet,
-                    tabs: const [
-                      Tab(
-                          icon: Icon(Icons.auto_awesome_outlined),
-                          text: 'For you'),
-                      Tab(
-                          icon: Icon(Icons.assignment_turned_in_outlined),
-                          text: 'Assignments'),
-                      Tab(
-                          icon: Icon(Icons.video_library_outlined),
-                          text: 'Lectures'),
-                      Tab(icon: Icon(Icons.person_outline), text: 'Mine'),
-                    ],
+            final viewportHeight = MediaQuery.of(context).size.height;
+            final tabHeight = (viewportHeight * 0.54).clamp(300.0, 520.0);
+
+            return SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.only(bottom: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildHero(
+                    context,
+                    userName: currentName,
+                    currentLevel: currentLevel,
+                    currentProgram: currentProgram,
+                    currentSession: currentSession,
+                    visibleCount: visiblePosts.length,
+                    assignmentCount: assignmentPosts.length,
+                    lectureCount: lecturePosts.length,
+                    dueSoonCount: dueSoonCount,
                   ),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildFeedList(
-                        context,
-                        posts: visiblePosts,
-                        emptyTitle: 'Nothing new for your cohort yet',
-                        emptySubtitle:
-                            'When class reps and lecturers publish posts tagged to your level or program, they will appear here automatically.',
-                        currentUserId: currentUserId,
-                        currentLevel: currentLevel,
-                        currentProgram: currentProgram,
-                        scope: _AcademicFeedScope.forYou,
-                      ),
-                      _buildFeedList(
-                        context,
-                        posts: assignmentPosts,
-                        emptyTitle: 'No assignments found yet',
-                        emptySubtitle:
-                            'Assignments tagged to your level, program or course will appear here once they are published.',
-                        currentUserId: currentUserId,
-                        currentLevel: currentLevel,
-                        currentProgram: currentProgram,
-                        scope: _AcademicFeedScope.assignments,
-                      ),
-                      _buildFeedList(
-                        context,
-                        posts: lecturePosts,
-                        emptyTitle: 'No lecture resources yet',
-                        emptySubtitle:
-                            'Recorded lectures, slides and audio notes from lecturers or reps will appear here.',
-                        currentUserId: currentUserId,
-                        currentLevel: currentLevel,
-                        currentProgram: currentProgram,
-                        scope: _AcademicFeedScope.lectures,
-                      ),
-                      _buildFeedList(
-                        context,
-                        posts: myPosts,
-                        emptyTitle: 'You have not posted anything yet',
-                        emptySubtitle:
-                            'Use the publish buttons above to create your first assignment or lecture post.',
-                        currentUserId: currentUserId,
-                        currentLevel: currentLevel,
-                        currentProgram: currentProgram,
-                        scope: _AcademicFeedScope.mine,
-                      ),
-                    ],
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _buildSearchBar(),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: TabBar(
+                      controller: _tabController,
+                      isScrollable: true,
+                      labelColor: RegentColors.violet,
+                      unselectedLabelColor:
+                          Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white60
+                              : Colors.black54,
+                      indicatorColor: RegentColors.violet,
+                      tabs: const [
+                        Tab(icon: Icon(Icons.auto_awesome_outlined), text: 'For you'),
+                        Tab(icon: Icon(Icons.assignment_turned_in_outlined), text: 'Assignments'),
+                        Tab(icon: Icon(Icons.video_library_outlined), text: 'Lectures'),
+                        Tab(icon: Icon(Icons.person_outline), text: 'Mine'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: tabHeight,
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildFeedList(
+                          context,
+                          posts: visiblePosts,
+                          emptyTitle: 'Nothing new for your cohort yet',
+                          emptySubtitle:
+                              'When class reps and lecturers publish posts tagged to your level or program, they will appear here automatically.',
+                          currentUserId: currentUserId,
+                          currentLevel: currentLevel,
+                          currentProgram: currentProgram,
+                          scope: _AcademicFeedScope.forYou,
+                        ),
+                        _buildFeedList(
+                          context,
+                          posts: assignmentPosts,
+                          emptyTitle: 'No assignments found yet',
+                          emptySubtitle:
+                              'Assignments tagged to your level, program or course will appear here once they are published.',
+                          currentUserId: currentUserId,
+                          currentLevel: currentLevel,
+                          currentProgram: currentProgram,
+                          scope: _AcademicFeedScope.assignments,
+                        ),
+                        _buildFeedList(
+                          context,
+                          posts: lecturePosts,
+                          emptyTitle: 'No lecture resources yet',
+                          emptySubtitle:
+                              'Recorded lectures, slides and audio notes from lecturers or reps will appear here.',
+                          currentUserId: currentUserId,
+                          currentLevel: currentLevel,
+                          currentProgram: currentProgram,
+                          scope: _AcademicFeedScope.lectures,
+                        ),
+                        _buildFeedList(
+                          context,
+                          posts: myPosts,
+                          emptyTitle: 'You have not posted anything yet',
+                          emptySubtitle:
+                              'Use the publish buttons above to create your first assignment or lecture post.',
+                          currentUserId: currentUserId,
+                          currentLevel: currentLevel,
+                          currentProgram: currentProgram,
+                          scope: _AcademicFeedScope.mine,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             );
           },
         );
@@ -380,6 +385,94 @@ class _AcademicsTabState extends State<AcademicsTab>
                   Icons.event_available_outlined),
             ],
           ),
+          const SizedBox(height: 16),
+          Text(
+            'Academic tools',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.92),
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+          children: [
+              _buildToolCard(
+                context,
+                icon: Icons.assignment_ind_rounded,
+                title: 'Course Registration',
+                subtitle: 'Register courses and preview before submission',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CourseRegistrationScreen(),
+                  ),
+                ),
+              ),
+              _buildToolCard(
+                context,
+                icon: Icons.menu_book_rounded,
+                title: 'Past Questions',
+                subtitle: 'Upload, search, view and download',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AcademicPastQuestionsScreen(),
+                  ),
+                ),
+              ),
+              _buildToolCard(
+                context,
+                icon: Icons.calendar_month_rounded,
+                title: 'Academic Calendar',
+                subtitle: 'See key dates and study milestones',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AcademicCalendarScreen(),
+                  ),
+                ),
+              ),
+              _buildToolCard(
+                context,
+                icon: Icons.library_books_rounded,
+                title: 'Course Info',
+                subtitle: 'Browse titles and programme info',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AcademicCourseInfoScreen(),
+                  ),
+                ),
+              ),
+              _buildToolCard(
+                context,
+                icon: Icons.grade_rounded,
+                title: 'Results & Grades',
+                subtitle: 'Check semester results and GPA',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AcademicResultsScreen(),
+                  ),
+                ),
+              ),
+              _buildToolCard(
+                context,
+                icon: Icons.support_agent_rounded,
+                title: 'Academic Support',
+                subtitle: 'Reach official academic offices',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AcademicSupportScreen(),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -445,6 +538,63 @@ class _AcademicsTabState extends State<AcademicsTab>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildToolCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    final width = MediaQuery.of(context).size.width;
+    final cardWidth = width >= 700 ? 170.0 : (width - 56) / 2;
+
+    return SizedBox(
+      width: cardWidth,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withOpacity(0.15)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.16),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: Colors.white, size: 20),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 12,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -927,18 +1077,6 @@ class AcademicPostCard extends StatelessWidget {
     required this.onTap,
     this.onDelete,
   });
-
-  Color _roleColor(String role) {
-    switch (role) {
-      case 'lecturer':
-        return Colors.blue;
-      case 'official':
-        return RegentColors.green;
-      case 'class_rep':
-      default:
-        return RegentColors.violet;
-    }
-  }
 
   Color _typeColor() {
     return post.isAssignment ? Colors.red : Colors.blue;

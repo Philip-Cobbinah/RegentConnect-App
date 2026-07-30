@@ -12,6 +12,10 @@ class UploadPastQuestionScreen extends StatefulWidget {
   final String? option;
   final int level;
   final int semester;
+  final String termLabel;
+  final String? initialCourseCode;
+  final String? initialCourseName;
+  final int? initialYear;
 
   const UploadPastQuestionScreen({
     super.key,
@@ -20,6 +24,10 @@ class UploadPastQuestionScreen extends StatefulWidget {
     this.option,
     required this.level,
     required this.semester,
+    this.termLabel = 'Semester',
+    this.initialCourseCode,
+    this.initialCourseName,
+    this.initialYear,
   });
 
   @override
@@ -41,6 +49,14 @@ class _UploadPastQuestionScreenState extends State<UploadPastQuestionScreen> {
   final pastQuestionsService = PastQuestionsService();
   final authService = AuthService();
   final ImagePicker _imagePicker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _courseCodeController.text = widget.initialCourseCode ?? '';
+    _courseNameController.text = widget.initialCourseName ?? '';
+    selectedYear = widget.initialYear;
+  }
 
   @override
   void dispose() {
@@ -441,7 +457,7 @@ class _UploadPastQuestionScreenState extends State<UploadPastQuestionScreen> {
                       Text('Program: ${widget.programName}'),
                       if (widget.option != null) Text('Option: ${widget.option}'),
                       Text('Level: ${widget.level}'),
-                      Text('Semester: ${widget.semester}'),
+                      Text('${widget.termLabel}: ${widget.semester}'),
                     ],
                   ),
                 ),

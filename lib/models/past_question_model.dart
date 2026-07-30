@@ -50,7 +50,7 @@ class PastQuestionModel {
       fileType: map['fileType'] ?? '',
       uploadedBy: map['uploadedBy'] ?? '',
       uploaderName: map['uploaderName'] ?? '',
-      uploadedAt: (map['uploadedAt'] as Timestamp).toDate(),
+      uploadedAt: _asDateTime(map['uploadedAt']) ?? DateTime.now(),
       downloadCount: map['downloadCount'] ?? 0,
     );
   }
@@ -72,5 +72,16 @@ class PastQuestionModel {
       'uploadedAt': Timestamp.fromDate(uploadedAt),
       'downloadCount': downloadCount,
     };
+  }
+}
+
+DateTime? _asDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+  if (value is Timestamp) return value.toDate();
+  try {
+    return (value as dynamic).toDate() as DateTime;
+  } catch (_) {
+    return DateTime.tryParse(value.toString());
   }
 }
