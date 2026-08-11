@@ -45,13 +45,19 @@ class _AlumniHubScreenState extends State<AlumniHubScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUser = _authService.currentUser;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Alumni Hub'),
       ),
       body: currentUser == null
-          ? const Center(child: Text('Sign in to view the alumni hub.'))
+          ? Center(
+              child: Text(
+                'Sign in to view the alumni hub.',
+                style: TextStyle(color: colorScheme.onSurface),
+              ),
+            )
           : StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
               stream: FirebaseFirestore.instance
                   .collection('users')
@@ -63,7 +69,8 @@ class _AlumniHubScreenState extends State<AlumniHubScreen> {
                 final level = int.tryParse(userData['level']?.toString() ?? '');
                 final expectedYear =
                     int.tryParse(userData['expectedGraduationYear']?.toString() ?? '');
-                final yearsRemaining = StudentProgress.yearsRemainingForLevel(level);
+                final yearsRemaining =
+                    StudentProgress.yearsRemainingForProfile(userData);
                 final name = (userData['fullName'] ??
                         userData['displayName'] ??
                         currentUser.displayName ??
@@ -126,7 +133,10 @@ class _AlumniHubScreenState extends State<AlumniHubScreen> {
                             isAlumni
                                 ? 'You have reached the alumni space. Stay connected with classmates, lecturers and Regent updates.'
                                 : 'We calculate your expected graduation year from the level you selected at signup, then bring you here when your student journey is complete.',
-                            style: const TextStyle(color: Colors.white, height: 1.4),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              height: 1.4,
+                            ),
                           ),
                           const SizedBox(height: 16),
                           Wrap(
@@ -219,7 +229,10 @@ class _AlumniHubScreenState extends State<AlumniHubScreen> {
                           isAlumni
                               ? 'You can now use the alumni network for updates, reconnect with classmates and receive Regent-wide announcements.'
                               : 'When your graduation period is reached, this hub becomes your alumni entry point and you can continue in the Regent alumni network.',
-                          style: const TextStyle(height: 1.45),
+                          style: TextStyle(
+                            height: 1.45,
+                            color: colorScheme.onSurface,
+                          ),
                         ),
                       ),
                     ),
@@ -235,17 +248,21 @@ class _AlumniHubScreenState extends State<AlumniHubScreen> {
     required IconData icon,
   }) {
     return Chip(
-      avatar: Icon(icon, size: 16, color: Colors.white),
+      avatar: Icon(icon, size: 16, color: RegentColors.darkViolet),
       label: Text(
         label,
-        style: const TextStyle(color: Colors.white),
+        style: const TextStyle(
+          color: RegentColors.darkViolet,
+          fontWeight: FontWeight.w600,
+        ),
       ),
-      backgroundColor: Colors.white.withOpacity(0.14),
-      side: BorderSide.none,
+      backgroundColor: Colors.white,
+      side: BorderSide(color: RegentColors.violet.withOpacity(0.18)),
     );
   }
 
   Widget _sectionHeader(String title, String subtitle) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
       child: Column(
@@ -253,12 +270,19 @@ class _AlumniHubScreenState extends State<AlumniHubScreen> {
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             subtitle,
-            style: TextStyle(color: Colors.grey.shade600, height: 1.35),
+            style: TextStyle(
+              color: colorScheme.onSurfaceVariant,
+              height: 1.35,
+            ),
           ),
         ],
       ),
@@ -283,6 +307,7 @@ class _AlumniHubScreenState extends State<AlumniHubScreen> {
   }
 
   Widget _detailRow(String label, String value) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -299,7 +324,10 @@ class _AlumniHubScreenState extends State<AlumniHubScreen> {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(height: 1.35),
+            style: TextStyle(
+              height: 1.35,
+              color: colorScheme.onSurface,
+            ),
           ),
         ),
       ],

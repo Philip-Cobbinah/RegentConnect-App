@@ -39,6 +39,7 @@ class AuthService {
           ? {
               'isAlumni': true,
               'graduationStatus': 'completed',
+              'studyYearsRemaining': 0,
             }
           : StudentProgress.graduationMetadataForLevel(level);
 
@@ -51,6 +52,10 @@ class AuthService {
         if (existingData['level'] != null) 'level': existingData['level'],
         if (existingData['program'] != null) 'program': existingData['program'],
         ...graduationMetadata,
+        if (existingData['graduationDate'] != null)
+          'graduationDate': existingData['graduationDate'],
+        if (existingData['completionDate'] != null)
+          'completionDate': existingData['completionDate'],
         'role': 'student',
         'isOfficial': false,
         'officialAccountId': null,

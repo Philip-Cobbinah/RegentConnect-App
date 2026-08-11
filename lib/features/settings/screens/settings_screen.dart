@@ -419,6 +419,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await authService.currentUser!.updatePhotoURL(url);
 
       if (mounted) Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile picture updated')),
+        );
+      }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
@@ -458,9 +463,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () async {
               final newName = controller.text.trim();
               if (newName.isNotEmpty) {
-                await _updateSetting('displayName', newName);
-                await authService.currentUser?.updateDisplayName(newName);
-                if (mounted) Navigator.pop(context);
+                final success = await _updateSetting('displayName', newName);
+                if (success && mounted) Navigator.pop(context);
               }
             },
             child: const Text('Save'),
@@ -499,8 +503,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () async {
               final newProgram = controller.text.trim();
               if (newProgram.isNotEmpty) {
-                await _updateSetting('program', newProgram);
-                if (mounted) Navigator.pop(context);
+                final success = await _updateSetting('program', newProgram);
+                if (success && mounted) Navigator.pop(context);
               }
             },
             child: const Text('Save'),
@@ -542,8 +546,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
-                await _updateSetting('level', selected);
-                if (mounted) Navigator.pop(context);
+                final success = await _updateSetting('level', selected);
+                if (success && mounted) Navigator.pop(context);
               },
               child: const Text('Save'),
             ),
@@ -582,8 +586,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              await _updateSetting('about', controller.text.trim());
-              if (mounted) Navigator.pop(context);
+              final success = await _updateSetting('about', controller.text.trim());
+              if (success && mounted) Navigator.pop(context);
             },
             child: const Text('Save'),
           ),
@@ -592,11 +596,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _updateSetting(String field, dynamic value) async {
-    final odId = authService.currentUser?.uid;
-    if (odId == null) return;
+  Future<bool> _updateSetting(String field, dynamic value) async {
+    final user = authService.currentUser;
+    if (user == null) return false;
 
-    await _firestore.collection('users').doc(odId).update({field: value});
+    try {
+      final updates = <String, dynamic>{
+        field: value,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (field == 'displayName') {
+        updates['fullName'] = value.toString().trim();
+      }
+
+      if (field == 'level') {
+        final level = int.tryParse(value.toString());
+        if (level != null) {
+          updates.addAll(StudentProgress.graduationMetadataForLevel(level));
+        }
+      }
+
+      await _firestore.collection('users').doc(user.uid).set(
+            updates,
+            SetOptions(merge: true),
+          );
+
+      if (field == 'displayName' && value.toString().trim().isNotEmpty) {
+        await user.updateDisplayName(value.toString().trim());
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Settings updated')),
+        );
+      }
+      return true;
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not update $field: $error')),
+        );
+      }
+      return false;
+    }
   }
 
   void _changePassword() {
@@ -622,12 +665,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              await authService.resetPassword(email);
-              if (mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Password reset email sent!')),
-                );
+              try {
+                await authService.resetPassword(email);
+                if (mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Password reset email sent!')),
+                  );
+                }
+              } catch (error) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not send reset email: $error')),
+                  );
+                }
               }
             },
             child: const Text('Send'),
@@ -667,7 +718,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 await authService.signOut();
                 debugPrint('Logout completed');
                 if (!mounted) return;
-                Navigator.of(pageContext, rootNavigator: true)
+                Navigator.of(pageContext)
                     .pushNamedAndRemoveUntil('/login', (route) => false);
               } catch (error) {
                 if (!mounted) return;
@@ -757,18 +808,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (!mounted) return;
       await authService.signOut();
       if (!mounted) return;
-      Navigator.of(pageContext, rootNavigator: true)
+      Navigator.of(pageContext)
           .pushNamedAndRemoveUntil('/login', (route) => false);
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
       if (error.code == 'requires-recent-login') {
-        ScaffoldMessenger.of(pageContext).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Please log out and sign in again, then try deleting the account.',
-            ),
-          ),
-        );
+        final password = await _promptForPassword(pageContext, user.email);
+        if (password == null || password.isEmpty) {
+          return;
+        }
+
+        try {
+          final credential = EmailAuthProvider.credential(
+            email: user.email!,
+            password: password,
+          );
+          await user.reauthenticateWithCredential(credential);
+          await _performAccountDeletion(pageContext);
+          return;
+        } catch (reauthError) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(pageContext).showSnackBar(
+            SnackBar(content: Text('Re-authentication failed: $reauthError')),
+          );
+        }
         return;
       }
       ScaffoldMessenger.of(pageContext).showSnackBar(
@@ -780,6 +843,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
         SnackBar(content: Text('Delete failed: $error')),
       );
     }
+  }
+
+  Future<String?> _promptForPassword(
+    BuildContext pageContext,
+    String? email,
+  ) async {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: pageContext,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        final isDark =
+            Provider.of<ThemeProvider>(dialogContext, listen: false).isDarkMode;
+        final colorScheme = Theme.of(dialogContext).colorScheme;
+        return AlertDialog(
+          backgroundColor: isDark ? RegentColors.darkCard : Colors.white,
+          title: Text(
+            'Confirm your password',
+            style: TextStyle(
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
+          content: TextField(
+            controller: controller,
+            obscureText: true,
+            style: TextStyle(color: colorScheme.onSurface),
+            decoration: InputDecoration(
+              labelText: email == null || email.isEmpty
+                  ? 'Password'
+                  : 'Password for $email',
+              labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+              child: const Text('Continue'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showInviteDialog(bool isDark) {

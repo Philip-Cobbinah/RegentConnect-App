@@ -16,7 +16,7 @@ class OfficialAccountProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
     final official = OfficialAccounts.byId(
           account['officialAccountId']?.toString(),
         ) ??
@@ -113,19 +113,16 @@ class OfficialAccountProfileScreen extends StatelessWidget {
                     _statusChip(
                       label: 'Verified office',
                       icon: Icons.verified_rounded,
-                      isDark: isDark,
                     ),
                     if (responseHours.isNotEmpty)
                       _statusChip(
                         label: responseHours,
                         icon: Icons.schedule_rounded,
-                        isDark: isDark,
                       ),
                     if (!isActive)
                       _statusChip(
                         label: 'Awaiting activation',
                         icon: Icons.pause_circle_outline_rounded,
-                        isDark: isDark,
                       ),
                   ],
                 ),
@@ -159,23 +156,31 @@ class OfficialAccountProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           _sectionHeader(
+            context,
             'Office details',
             'Contact and live inbox details',
           ),
           _detailCard(
             children: [
-              _detailRow('Email', email.isEmpty ? 'Not available' : email),
               _detailRow(
+                context,
+                'Email',
+                email.isEmpty ? 'Not available' : email,
+              ),
+              _detailRow(
+                context,
                 'Office',
                 office,
               ),
               _detailRow(
+                context,
                 'Response hours',
                 responseHours.isEmpty
                     ? 'Monday-Friday, 8:00 AM-5:00 PM'
                     : responseHours,
               ),
               _detailRow(
+                context,
                 'Status',
                 isActive ? 'Active office inbox' : 'Ready to be activated',
               ),
@@ -183,6 +188,7 @@ class OfficialAccountProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           _sectionHeader(
+            context,
             'About this office',
             'What students can ask here and how it supports them',
           ),
@@ -191,33 +197,47 @@ class OfficialAccountProfileScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               child: Text(
                 description,
-                style: const TextStyle(height: 1.45),
+                style: TextStyle(
+                  height: 1.45,
+                  color: colorScheme.onSurface,
+                ),
               ),
             ),
           ),
           const SizedBox(height: 18),
           _sectionHeader(
+            context,
             'Regent university at a glance',
             'A short summary students can review quickly',
           ),
           _detailCard(
             children: [
-              _detailRow('Institution', RegentUniversityProfile.shortName),
-              _detailRow('Motto', RegentUniversityProfile.motto),
               _detailRow(
+                context,
+                'Institution',
+                RegentUniversityProfile.shortName,
+              ),
+              _detailRow(context, 'Motto', RegentUniversityProfile.motto),
+              _detailRow(
+                context,
                 'Study sessions',
                 RegentUniversityProfile.studyStreams
                     .map((stream) => stream.title)
                     .join(', '),
               ),
               _detailRow(
+                context,
                 'Campus',
                 RegentUniversityProfile.campusAddress,
               ),
             ],
           ),
           const SizedBox(height: 18),
-          _sectionHeader('Student resources', 'Useful school-wide services'),
+          _sectionHeader(
+            context,
+            'Student resources',
+            'Useful school-wide services',
+          ),
           ...RegentUniversityProfile.onlineServices.take(2).map((item) {
             return Card(
               margin: const EdgeInsets.only(bottom: 10),
@@ -230,7 +250,10 @@ class OfficialAccountProfileScreen extends StatelessWidget {
                   item.title,
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
-                subtitle: Text(item.description),
+                subtitle: Text(
+                  item.description,
+                  style: TextStyle(color: colorScheme.onSurfaceVariant),
+                ),
               ),
             );
           }),
@@ -260,32 +283,29 @@ class OfficialAccountProfileScreen extends StatelessWidget {
   Widget _statusChip({
     required String label,
     required IconData icon,
-    required bool isDark,
   }) {
     return Chip(
       avatar: Icon(
         icon,
         size: 16,
-        color: isDark ? Colors.white : RegentColors.darkViolet,
+        color: RegentColors.darkViolet,
       ),
       label: Text(
         label,
-        style: TextStyle(
-          color: isDark ? Colors.white : RegentColors.darkViolet,
+        style: const TextStyle(
+          color: RegentColors.darkViolet,
           fontWeight: FontWeight.w600,
         ),
       ),
-      backgroundColor:
-          isDark ? Colors.white.withOpacity(0.14) : Colors.white.withOpacity(0.9),
+      backgroundColor: Colors.white,
       side: BorderSide(
-        color: isDark
-            ? Colors.transparent
-            : RegentColors.violet.withOpacity(0.18),
+        color: RegentColors.violet.withOpacity(0.18),
       ),
     );
   }
 
-  Widget _sectionHeader(String title, String subtitle) {
+  Widget _sectionHeader(BuildContext context, String title, String subtitle) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
       child: Column(
@@ -293,12 +313,19 @@ class OfficialAccountProfileScreen extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             subtitle,
-            style: TextStyle(color: Colors.grey.shade600, height: 1.35),
+            style: TextStyle(
+              color: colorScheme.onSurfaceVariant,
+              height: 1.35,
+            ),
           ),
         ],
       ),
@@ -322,7 +349,8 @@ class OfficialAccountProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _detailRow(String label, String value) {
+  Widget _detailRow(BuildContext context, String label, String value) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -339,7 +367,10 @@ class OfficialAccountProfileScreen extends StatelessWidget {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(height: 1.4),
+            style: TextStyle(
+              height: 1.4,
+              color: colorScheme.onSurface,
+            ),
           ),
         ),
       ],

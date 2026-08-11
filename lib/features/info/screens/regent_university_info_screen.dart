@@ -29,6 +29,7 @@ class RegentUniversityInfoScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Regent University Info'),
@@ -93,12 +94,17 @@ class RegentUniversityInfoScreen extends StatelessWidget {
                   children: RegentUniversityProfile.coreValues
                       .map(
                         (value) => Chip(
-                          backgroundColor: Colors.white.withOpacity(0.15),
+                          backgroundColor: Colors.white,
                           label: Text(
                             value,
-                            style: const TextStyle(color: Colors.white),
+                            style: const TextStyle(
+                              color: RegentColors.darkViolet,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                          side: BorderSide.none,
+                          side: BorderSide(
+                            color: RegentColors.violet.withOpacity(0.18),
+                          ),
                         ),
                       )
                       .toList(),
@@ -122,45 +128,82 @@ class RegentUniversityInfoScreen extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           _sectionHeader(
+            context,
             'Overview',
             'Identity, accreditation, founder and mission',
           ),
           _detailCard(
             children: [
-              _detailRow(
-                  'Institution', RegentUniversityProfile.institutionName),
-              _detailRow('Founder & Chancellor',
+              _detailRow(context, 'Institution',
+                  RegentUniversityProfile.institutionName),
+              _detailRow(context, 'Founder & Chancellor',
                   RegentUniversityProfile.founderAndChancellor),
               _detailRow(
-                  'Accreditation', RegentUniversityProfile.accreditation),
-              _detailRow('Vision', RegentUniversityProfile.vision),
+                  context, 'Accreditation', RegentUniversityProfile.accreditation),
+              _detailRow(context, 'Vision', RegentUniversityProfile.vision),
             ],
           ),
-          _sectionHeader('Affiliations', 'Connected universities and partners'),
-          _chipWrap(RegentUniversityProfile.affiliations),
-          _sectionHeader('Study streams', 'Choose your delivery schedule'),
-          _streamCards(),
-          _sectionHeader('Undergraduate programmes', 'By faculty'),
-          ...RegentUniversityProfile.undergraduateProgrammes
-              .map(_programmeGroupCard),
-          _sectionHeader('Postgraduate programmes', 'Masters and PhD options'),
-          ...RegentUniversityProfile.postgraduateProgrammes
-              .map(_programmeGroupCard),
           _sectionHeader(
-              'Admissions & entry', 'Application fee and entry rules'),
-          ...RegentUniversityProfile.admissions.map(_infoItemCard),
-          _sectionHeader('Online services', 'Student tools and portals'),
-          ...RegentUniversityProfile.onlineServices.map(_infoItemCard),
-          _sectionHeader('Campus contact', 'Find and reach the university'),
+            context,
+            'Affiliations',
+            'Connected universities and partners',
+          ),
+          _chipWrap(context, RegentUniversityProfile.affiliations),
+          _sectionHeader(
+            context,
+            'Study streams',
+            'Choose your delivery schedule',
+          ),
+          _streamCards(context),
+          _sectionHeader(context, 'Undergraduate programmes', 'By faculty'),
+          ...RegentUniversityProfile.undergraduateProgrammes
+              .map((group) => _programmeGroupCard(context, group)),
+          _sectionHeader(
+            context,
+            'Postgraduate programmes',
+            'Masters and PhD options',
+          ),
+          ...RegentUniversityProfile.postgraduateProgrammes
+              .map((group) => _programmeGroupCard(context, group)),
+          _sectionHeader(
+            context,
+            'Admissions & entry',
+            'Application fee and entry rules',
+          ),
+          ...RegentUniversityProfile.admissions
+              .map((item) => _infoItemCard(context, item)),
+          _sectionHeader(
+            context,
+            'Online services',
+            'Student tools and portals',
+          ),
+          ...RegentUniversityProfile.onlineServices
+              .map((item) => _infoItemCard(context, item)),
+          _sectionHeader(
+            context,
+            'Campus contact',
+            'Find and reach the university',
+          ),
           _detailCard(
             children: [
               _detailRow(
-                  'Campus address', RegentUniversityProfile.campusAddress),
-              _detailRow('Phone contacts',
-                  RegentUniversityProfile.phoneContacts.join('\n')),
-              _detailRow('Emails', RegentUniversityProfile.emails.join('\n')),
-              _detailRow('Website', RegentUniversityProfile.website),
+                context,
+                'Campus address',
+                RegentUniversityProfile.campusAddress,
+              ),
               _detailRow(
+                context,
+                'Phone contacts',
+                RegentUniversityProfile.phoneContacts.join('\n'),
+              ),
+              _detailRow(
+                context,
+                'Emails',
+                RegentUniversityProfile.emails.join('\n'),
+              ),
+              _detailRow(context, 'Website', RegentUniversityProfile.website),
+              _detailRow(
+                context,
                 'Social handles',
                 RegentUniversityProfile.socialHandles.join('\n'),
               ),
@@ -197,7 +240,8 @@ class RegentUniversityInfoScreen extends StatelessWidget {
     );
   }
 
-  Widget _sectionHeader(String title, String subtitle) {
+  Widget _sectionHeader(BuildContext context, String title, String subtitle) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 18, 4, 10),
       child: Column(
@@ -205,12 +249,19 @@ class RegentUniversityInfoScreen extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             subtitle,
-            style: TextStyle(color: Colors.grey.shade600, height: 1.35),
+            style: TextStyle(
+              color: colorScheme.onSurfaceVariant,
+              height: 1.35,
+            ),
           ),
         ],
       ),
@@ -234,7 +285,8 @@ class RegentUniversityInfoScreen extends StatelessWidget {
     );
   }
 
-  Widget _detailRow(String label, String value) {
+  Widget _detailRow(BuildContext context, String label, String value) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -251,29 +303,43 @@ class RegentUniversityInfoScreen extends StatelessWidget {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(height: 1.4),
+            style: TextStyle(
+              height: 1.4,
+              color: colorScheme.onSurface,
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _chipWrap(List<String> values) {
+  Widget _chipWrap(BuildContext context, List<String> values) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: values
           .map(
             (value) => Chip(
-              label: Text(value),
-              backgroundColor: RegentColors.violet.withOpacity(0.08),
+              label: Text(
+                value,
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              backgroundColor: colorScheme.surface,
+              side: BorderSide(
+                color: RegentColors.violet.withOpacity(0.18),
+              ),
             ),
           )
           .toList(),
     );
   }
 
-  Widget _streamCards() {
+  Widget _streamCards(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       children: RegentUniversityProfile.studyStreams.map((stream) {
         return Card(
@@ -285,11 +351,17 @@ class RegentUniversityInfoScreen extends StatelessWidget {
             ),
             title: Text(
               stream.title,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: colorScheme.onSurface,
+              ),
             ),
             subtitle: Text(
               stream.description,
-              style: TextStyle(color: Colors.grey.shade600, height: 1.35),
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.35,
+              ),
             ),
           ),
         );
@@ -297,7 +369,11 @@ class RegentUniversityInfoScreen extends StatelessWidget {
     );
   }
 
-  Widget _programmeGroupCard(RegentProgrammeGroup group) {
+  Widget _programmeGroupCard(
+    BuildContext context,
+    RegentProgrammeGroup group,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
@@ -307,9 +383,10 @@ class RegentUniversityInfoScreen extends StatelessWidget {
           children: [
             Text(
               group.title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 16,
+                color: colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 10),
@@ -319,11 +396,20 @@ class RegentUniversityInfoScreen extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('•  ', style: TextStyle(fontSize: 16)),
+                    Text(
+                      '•  ',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
                     Expanded(
                       child: Text(
                         programme,
-                        style: const TextStyle(height: 1.35),
+                        style: TextStyle(
+                          height: 1.35,
+                          color: colorScheme.onSurface,
+                        ),
                       ),
                     ),
                   ],
@@ -335,7 +421,8 @@ class RegentUniversityInfoScreen extends StatelessWidget {
     );
   }
 
-  Widget _infoItemCard(RegentInfoItem item) {
+  Widget _infoItemCard(BuildContext context, RegentInfoItem item) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
@@ -349,11 +436,17 @@ class RegentUniversityInfoScreen extends StatelessWidget {
         ),
         title: Text(
           item.title,
-          style: const TextStyle(fontWeight: FontWeight.w700),
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: colorScheme.onSurface,
+          ),
         ),
         subtitle: Text(
           item.description,
-          style: TextStyle(color: Colors.grey.shade600, height: 1.35),
+          style: TextStyle(
+            color: colorScheme.onSurfaceVariant,
+            height: 1.35,
+          ),
         ),
       ),
     );
@@ -371,26 +464,30 @@ class _StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.12),
+          color: colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.15)),
+          border: Border.all(color: RegentColors.violet.withOpacity(0.18)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
               value,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: colorScheme.onSurface,
                 fontWeight: FontWeight.w700,
               ),
             ),
