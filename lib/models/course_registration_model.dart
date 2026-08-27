@@ -1,16 +1,53 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+class RegisteredCourse {
+  final String code;
+  final String title;
+  final int creditHours;
+  final bool isElective;
+
+  const RegisteredCourse({
+    required this.code,
+    required this.title,
+    required this.creditHours,
+    this.isElective = false,
+  });
+
+  factory RegisteredCourse.fromMap(Map<String, dynamic> map) => RegisteredCourse(
+        code: _courseString(map['code']),
+        title: _courseString(map['title']),
+        creditHours: _courseInt(map['creditHours']),
+        isElective: map['isElective'] == true,
+      );
+
+  Map<String, dynamic> toMap() => {
+        'code': code,
+        'title': title,
+        'creditHours': creditHours,
+        'isElective': isElective,
+      };
+
+  static String _courseString(dynamic value) => value?.toString().trim() ?? '';
+  static int _courseInt(dynamic value) => value is num
+      ? value.toInt()
+      : int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
 class CourseRegistrationModel {
   final String id;
   final String studentUid;
   final String studentId;
   final String fullName;
+  final String phoneNumber;
   final int level;
   final int term;
   final String termLabel;
   final String facultyName;
   final String programName;
   final String academicSession;
+  final String academicYear;
+  final List<RegisteredCourse> courses;
+  final String recipientLabel;
   final DateTime registrationDate;
   final String status;
   final String? attachmentUrl;
@@ -18,6 +55,8 @@ class CourseRegistrationModel {
   final String? attachmentName;
   final String? attachmentContentType;
   final int? attachmentSize;
+  final String? pdfUrl;
+  final String? pdfStoragePath;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -26,12 +65,16 @@ class CourseRegistrationModel {
     required this.studentUid,
     required this.studentId,
     required this.fullName,
+    required this.phoneNumber,
     required this.level,
     required this.term,
     required this.termLabel,
     required this.facultyName,
     required this.programName,
     required this.academicSession,
+    required this.academicYear,
+    required this.courses,
+    required this.recipientLabel,
     required this.registrationDate,
     required this.status,
     required this.createdAt,
@@ -41,6 +84,8 @@ class CourseRegistrationModel {
     this.attachmentName,
     this.attachmentContentType,
     this.attachmentSize,
+    this.pdfUrl,
+    this.pdfStoragePath,
   });
 
   factory CourseRegistrationModel.fromMap(
@@ -52,12 +97,19 @@ class CourseRegistrationModel {
       studentUid: _string(map['studentUid']),
       studentId: _string(map['studentId']),
       fullName: _string(map['fullName']),
+      phoneNumber: _string(map['phoneNumber']),
       level: _int(map['level'], fallback: 0),
       term: _int(map['term'], fallback: 1),
       termLabel: _string(map['termLabel'], fallback: 'Semester'),
       facultyName: _string(map['facultyName']),
       programName: _string(map['programName']),
       academicSession: _string(map['academicSession'], fallback: 'morning'),
+      academicYear: _string(map['academicYear']),
+      courses: (map['courses'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(RegisteredCourse.fromMap)
+          .toList(growable: false),
+      recipientLabel: _string(map['recipientLabel'], fallback: 'Faculty Office'),
       registrationDate: _dateTime(map['registrationDate']) ?? DateTime.now(),
       status: _string(map['status'], fallback: 'pending'),
       attachmentUrl: _nullableString(map['attachmentUrl']),
@@ -65,6 +117,8 @@ class CourseRegistrationModel {
       attachmentName: _nullableString(map['attachmentName']),
       attachmentContentType: _nullableString(map['attachmentContentType']),
       attachmentSize: _nullableInt(map['attachmentSize']),
+      pdfUrl: _nullableString(map['pdfUrl']),
+      pdfStoragePath: _nullableString(map['pdfStoragePath']),
       createdAt: _dateTime(map['createdAt']) ??
           _dateTime(map['updatedAt']) ??
           DateTime.now(),
@@ -80,12 +134,16 @@ class CourseRegistrationModel {
       'studentUid': studentUid,
       'studentId': studentId,
       'fullName': fullName,
+      'phoneNumber': phoneNumber,
       'level': level,
       'term': term,
       'termLabel': termLabel,
       'facultyName': facultyName,
       'programName': programName,
       'academicSession': academicSession,
+      'academicYear': academicYear,
+      'courses': courses.map((course) => course.toMap()).toList(),
+      'recipientLabel': recipientLabel,
       'registrationDate': Timestamp.fromDate(registrationDate),
       'status': status,
       'attachmentUrl': attachmentUrl,
@@ -93,6 +151,8 @@ class CourseRegistrationModel {
       'attachmentName': attachmentName,
       'attachmentContentType': attachmentContentType,
       'attachmentSize': attachmentSize,
+      'pdfUrl': pdfUrl,
+      'pdfStoragePath': pdfStoragePath,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };

@@ -18,6 +18,7 @@ class CourseRegistrationService {
   Future<String> submitRegistration({
     required String studentId,
     required String fullName,
+    required String phoneNumber,
     required int level,
     required int term,
     required String termLabel,
@@ -25,6 +26,10 @@ class CourseRegistrationService {
     required String facultyName,
     required String programName,
     required DateTime registrationDate,
+    required String academicYear,
+    required List<RegisteredCourse> courses,
+    required String recipientLabel,
+    Uint8List? registrationPdfBytes,
     Uint8List? attachmentBytes,
     String? attachmentName,
     String? attachmentContentType,
@@ -36,10 +41,12 @@ class CourseRegistrationService {
 
     final resolvedStudentId = studentId.trim();
     final resolvedFullName = fullName.trim();
+    final resolvedPhoneNumber = phoneNumber.trim();
     final resolvedFaculty = facultyName.trim();
     final resolvedProgram = programName.trim();
     if (resolvedStudentId.isEmpty ||
         resolvedFullName.isEmpty ||
+        resolvedPhoneNumber.isEmpty ||
         resolvedFaculty.isEmpty ||
         resolvedProgram.isEmpty) {
       throw Exception('Please complete the registration form.');
@@ -52,6 +59,8 @@ class CourseRegistrationService {
     String? uploadedFileName;
     String? uploadedContentType;
     int? uploadedSize;
+    String? uploadedPdfUrl;
+    String? uploadedPdfStoragePath;
 
     if (attachmentBytes != null && attachmentBytes.isNotEmpty) {
       final safeName = MediaUtils.sanitizeFileName(
@@ -89,17 +98,41 @@ class CourseRegistrationService {
       uploadedSize = attachmentBytes.length;
     }
 
+    if (registrationPdfBytes != null && registrationPdfBytes.isNotEmpty) {
+      final storageRef = _storage.ref().child(
+            'course_registrations/${docRef.id}/$currentUserId/form/'
+            'course-registration-${DateTime.now().millisecondsSinceEpoch}.pdf',
+          );
+      final task = await storageRef.putData(
+        registrationPdfBytes,
+        SettableMetadata(
+          contentType: 'application/pdf',
+          customMetadata: {
+            'registrationId': docRef.id,
+            'uploaderUid': currentUserId,
+            'mediaKind': 'registration-form',
+          },
+        ),
+      );
+      uploadedPdfUrl = await task.ref.getDownloadURL();
+      uploadedPdfStoragePath = task.ref.fullPath;
+    }
+
     final record = CourseRegistrationModel(
       id: docRef.id,
       studentUid: user.uid,
       studentId: resolvedStudentId,
       fullName: resolvedFullName,
+      phoneNumber: resolvedPhoneNumber,
       level: level,
       term: term,
       termLabel: termLabel,
       facultyName: resolvedFaculty,
       programName: resolvedProgram,
       academicSession: academicSession,
+      academicYear: academicYear,
+      courses: courses,
+      recipientLabel: recipientLabel,
       registrationDate: registrationDate,
       status: 'pending',
       attachmentUrl: uploadedUrl,
@@ -107,6 +140,8 @@ class CourseRegistrationService {
       attachmentName: uploadedFileName,
       attachmentContentType: uploadedContentType,
       attachmentSize: uploadedSize,
+      pdfUrl: uploadedPdfUrl,
+      pdfStoragePath: uploadedPdfStoragePath,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -117,6 +152,7 @@ class CourseRegistrationService {
       'searchText': [
         resolvedStudentId,
         resolvedFullName,
+        resolvedPhoneNumber,
         resolvedFaculty,
         resolvedProgram,
         'Level $level',

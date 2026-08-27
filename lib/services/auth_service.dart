@@ -165,21 +165,11 @@ class AuthService {
         if (officialAccount == null) {
           rethrow;
         }
-
-        try {
-          credential = await _auth.createUserWithEmailAndPassword(
-            email: normalizedEmail,
-            password: password,
-          );
-        } on FirebaseAuthException catch (createError) {
-          if (createError.code != 'email-already-in-use') {
-            rethrow;
-          }
-          credential = await _auth.signInWithEmailAndPassword(
-            email: normalizedEmail,
-            password: password,
-          );
-        }
+        throw FirebaseAuthException(
+          code: 'official-account-not-activated',
+          message:
+              'This official account has not been activated. Ask the Regent Connect administrator to provision the HoD inbox first.',
+        );
       }
 
       // Update online status

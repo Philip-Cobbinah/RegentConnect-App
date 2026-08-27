@@ -2,17 +2,23 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/official_accounts.dart';
 import '../../../core/programs_data.dart';
 import '../../../core/regent_university_profile.dart';
 import '../../../core/theme.dart';
+import '../../../core/timetable_data.dart';
 import '../../../models/academic_result_model.dart';
 import '../../../models/past_question_model.dart';
 import '../../../services/academic_results_service.dart';
+import '../../../services/transcript_pdf_service.dart';
+import '../../../services/chat_service.dart';
 import '../../../services/past_questions_service.dart';
+import '../../../services/status_service.dart';
 import '../../chat/screens/official_account_profile_screen.dart';
+import '../../ai_bot/screens/regent_ai_screen.dart';
 import 'upload_past_question_screen.dart';
 import 'view_past_questions_screen.dart';
 
@@ -40,6 +46,8 @@ class AcademicPastQuestionsScreen extends StatefulWidget {
 class _AcademicPastQuestionsScreenState extends State<AcademicPastQuestionsScreen>
     with SingleTickerProviderStateMixin {
   final _service = PastQuestionsService();
+  final _chatService = ChatService();
+  final _statusService = StatusService();
   final _firestore = FirebaseFirestore.instance;
   final _searchController = TextEditingController();
 
@@ -51,6 +59,33 @@ class _AcademicPastQuestionsScreenState extends State<AcademicPastQuestionsScree
   String _courseQuery = '';
   String _searchQuery = '';
   bool _bootstrappedProfile = false;
+
+  List<CourseData> get _selectedCurriculumCourses {
+    final program = _selectedProgram;
+    final level = _selectedLevel;
+    final term = _selectedTerm;
+    if (program == null || level == null || term == null) {
+      return const <CourseData>[];
+    }
+    return program.courses
+        .where((course) => course.level == level && course.semester == term)
+        .toList(growable: false);
+  }
+
+  List<CourseData> _matchingCurriculumCourses(String query) {
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty) return _selectedCurriculumCourses;
+    return _selectedCurriculumCourses
+        .where((course) =>
+            course.code.toLowerCase().contains(normalized) ||
+            course.name.toLowerCase().contains(normalized))
+        .toList(growable: false);
+  }
+
+  CourseData? get _activeCourse {
+    final matches = _matchingCurriculumCourses(_courseQuery);
+    return matches.length == 1 ? matches.first : null;
+  }
 
   @override
   void dispose() {
@@ -131,12 +166,8 @@ class _AcademicPastQuestionsScreenState extends State<AcademicPastQuestionsScree
                       }
 
                       final questions = snapshot.data ?? const [];
-                      final courseTitles = questions
-                          .map((question) => question.courseName.trim())
-                          .where((value) => value.isNotEmpty)
-                          .toSet()
-                          .toList()
-                        ..sort();
+                      final matchingCourses =
+                          _matchingCurriculumCourses(_searchQuery);
 
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,9 +182,9 @@ class _AcademicPastQuestionsScreenState extends State<AcademicPastQuestionsScree
                             sessionLabel: session,
                           ),
                           const SizedBox(height: 16),
-                          _buildQuestionSearchCard(courseTitles),
+                          _buildQuestionSearchCard(matchingCourses),
                           const SizedBox(height: 16),
-                          if (courseTitles.isNotEmpty)
+                          if (matchingCourses.isNotEmpty)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 8),
                               child: Text(
@@ -164,23 +195,23 @@ class _AcademicPastQuestionsScreenState extends State<AcademicPastQuestionsScree
                                     ?.copyWith(fontWeight: FontWeight.w800),
                               ),
                             ),
-                          if (courseTitles.isNotEmpty)
+                          if (matchingCourses.isNotEmpty)
                             Wrap(
                               spacing: 8,
                               runSpacing: 8,
-                              children: courseTitles
-                                  .take(10)
+                              children: matchingCourses
+                                  .take(16)
                                   .map(
-                                    (title) => ChoiceChip(
-                                      label: Text(title),
+                                    (course) => ChoiceChip(
+                                      label: Text('${course.code} · ${course.name}'),
                                       selected:
                                           _courseQuery.trim().toLowerCase() ==
-                                              title.toLowerCase(),
+                                              course.name.toLowerCase(),
                                       onSelected: (_) {
                                         setState(() {
-                                          _courseQuery = title;
-                                          _searchQuery = title;
-                                          _searchController.text = title;
+                                          _courseQuery = course.name;
+                                          _searchQuery = course.name;
+                                          _searchController.text = course.name;
                                         });
                                       },
                                     ),
@@ -519,9 +550,11 @@ class _AcademicPastQuestionsScreenState extends State<AcademicPastQuestionsScree
                 labelText: 'Course title search',
                 hintText: 'Type a course title or code',
                 prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: _searchController.text.isEmpty
-                    ? null
-                    : IconButton(
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_searchController.text.isNotEmpty)
+                      IconButton(
                         onPressed: () {
                           setState(() {
                             _searchController.clear();
@@ -531,6 +564,16 @@ class _AcademicPastQuestionsScreenState extends State<AcademicPastQuestionsScree
                         },
                         icon: const Icon(Icons.clear_rounded),
                       ),
+                    IconButton(
+                      tooltip: 'Search courses',
+                      onPressed: () => setState(() {
+                        _searchQuery = _searchController.text.trim();
+                        _courseQuery = _searchQuery;
+                      }),
+                      icon: const Icon(Icons.search_rounded),
+                    ),
+                  ],
+                ),
               ),
               onChanged: (value) {
                 setState(() {
@@ -538,6 +581,10 @@ class _AcademicPastQuestionsScreenState extends State<AcademicPastQuestionsScree
                   _courseQuery = value;
                 });
               },
+              onSubmitted: (value) => setState(() {
+                _searchQuery = value.trim();
+                _courseQuery = _searchQuery;
+              }),
             ),
             const SizedBox(height: 10),
             Text(
@@ -595,9 +642,11 @@ class _AcademicPastQuestionsScreenState extends State<AcademicPastQuestionsScree
                                 level: level!,
                                 semester: term!,
                                 termLabel: termLabel,
-                                initialCourseName: _courseQuery.trim().isEmpty
-                                    ? null
-                                    : _courseQuery.trim(),
+                                initialCourseCode: _activeCourse?.code,
+                                initialCourseName: _activeCourse?.name ??
+                                    (_courseQuery.trim().isEmpty
+                                        ? null
+                                        : _courseQuery.trim()),
                               ),
                             ),
                           )
@@ -631,21 +680,11 @@ class _AcademicPastQuestionsScreenState extends State<AcademicPastQuestionsScree
                   label: 'Download',
                   color: Colors.blue,
                   onPressed: hasSelection
-                      ? () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ViewPastQuestionsScreen(
-                                facultyName: faculty!.name,
-                                programName: program!.name,
-                                option: null,
-                                level: level!,
-                                semester: term!,
-                                termLabel: termLabel,
-                                courseTitleQuery: _courseQuery.trim().isEmpty
-                                    ? null
-                                    : _courseQuery.trim(),
-                              ),
-                            ),
+                      ? () => _downloadFirstMatchingQuestion(
+                            facultyName: faculty!.name,
+                            programName: program!.name,
+                            level: level!,
+                            term: term!,
                           )
                       : null,
                 ),
@@ -748,7 +787,7 @@ class _AcademicPastQuestionsScreenState extends State<AcademicPastQuestionsScree
     );
   }
 
-  Widget _buildQuestionSearchCard(List<String> courseTitles) {
+  Widget _buildQuestionSearchCard(List<CourseData> courses) {
     return Card(
       elevation: 0,
       child: Padding(
@@ -771,9 +810,9 @@ class _AcademicPastQuestionsScreenState extends State<AcademicPastQuestionsScree
             ),
             const SizedBox(height: 10),
             Text(
-              courseTitles.isEmpty
-                  ? 'No related titles have been uploaded for this selection yet.'
-                  : 'Tap a title to keep only the related past questions in view.',
+              courses.isEmpty
+                  ? 'No course in this curriculum matches that keyword.'
+                  : 'These official courses match your selection. Tap one to filter its uploaded papers.',
               style: TextStyle(color: Colors.grey.shade700, height: 1.35),
             ),
           ],
@@ -848,10 +887,156 @@ class _AcademicPastQuestionsScreenState extends State<AcademicPastQuestionsScree
                 );
               }
             },
+            onStudyWithAi: () => _openRegentAi(question),
+            onShare: () => _shareQuestion(question),
           ),
         ),
       ],
     );
+  }
+
+  Future<void> _downloadFirstMatchingQuestion({
+    required String facultyName,
+    required String programName,
+    required int level,
+    required int term,
+  }) async {
+    final questions = await _service
+        .watchPastQuestions(
+          facultyName: facultyName,
+          programName: programName,
+          level: level,
+          semester: term,
+          year: _selectedYear,
+          query: _searchQuery,
+        )
+        .first;
+    if (questions.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No matching past question is ready to download.')),
+        );
+      }
+      return;
+    }
+    final question = questions.first;
+    await launchUrl(Uri.parse(question.fileUrl), mode: LaunchMode.externalApplication);
+    await _service.incrementDownloadCount(question.id);
+  }
+
+  void _openRegentAi(PastQuestionModel question) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RegentAIScreen(
+          initialPrompt:
+              'Help me solve and study this Regent past question. Course: ${question.courseCode} ${question.courseName}. Exam year: ${question.year}. File: ${question.fileUrl}\n\nFirst, ask me which question number or topic I want to work through. Then explain the solution step by step.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _shareQuestion(PastQuestionModel question) async {
+    final destination = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Share past question', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              ListTile(
+                leading: const Icon(Icons.person_add_alt_1_rounded),
+                title: const Text('Share with a student or another app'),
+                subtitle: const Text('Choose a person, app, or copy the link.'),
+                onTap: () => Navigator.pop(context, 'external'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.groups_rounded),
+                title: const Text('Send to a group or channel'),
+                subtitle: const Text('Post the paper link to one of your communities.'),
+                onTap: () => Navigator.pop(context, 'group'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.history_toggle_off_rounded),
+                title: const Text('Post to status'),
+                subtitle: const Text('Share a 24-hour study link with your contacts.'),
+                onTap: () => Navigator.pop(context, 'status'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (destination == null) return;
+    final message = _shareTextFor(question);
+    if (destination == 'external') {
+      await Share.share(message, subject: '${question.courseName} past question');
+    } else if (destination == 'status') {
+      await _statusService.postStatus(type: 'text', text: message);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Past question shared to your status.')),
+        );
+      }
+    } else if (destination == 'group') {
+      await _shareQuestionToGroup(question, message);
+    }
+  }
+
+  String _shareTextFor(PastQuestionModel question) =>
+      'Regent past question: ${question.courseCode} ${question.courseName} (${question.year}).\n${question.fileUrl}';
+
+  Future<void> _shareQuestionToGroup(
+    PastQuestionModel question,
+    String message,
+  ) async {
+    final groupId = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => SafeArea(
+        child: StreamBuilder<QuerySnapshot>(
+          stream: _chatService.getMyGroups(),
+          builder: (context, snapshot) {
+            final groups = snapshot.data?.docs ?? const [];
+            return ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
+              children: [
+                const Text('Send to a group or channel', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                if (groups.isEmpty)
+                  const ListTile(title: Text('You have not joined any groups yet.')),
+                ...groups.map((group) => ListTile(
+                      leading: const Icon(Icons.groups_rounded),
+                      title: Text(group.data() is Map<String, dynamic>
+                          ? ((group.data() as Map<String, dynamic>)['name']?.toString() ?? 'Community')
+                          : 'Community'),
+                      onTap: () => Navigator.pop(context, group.id),
+                    )),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+    if (groupId == null) return;
+    await _chatService.sendGroupMessage(
+      groupId: groupId,
+      message: message,
+      metadata: {'pastQuestionId': question.id, 'pastQuestionUrl': question.fileUrl},
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Past question shared with the group.')),
+      );
+    }
   }
 
   Widget _buildPrompt() {
@@ -886,11 +1071,15 @@ class _PastQuestionResultCard extends StatelessWidget {
     required this.question,
     required this.onView,
     required this.onDownload,
+    required this.onStudyWithAi,
+    required this.onShare,
   });
 
   final PastQuestionModel question;
   final VoidCallback onView;
   final VoidCallback onDownload;
+  final VoidCallback onStudyWithAi;
+  final VoidCallback onShare;
 
   @override
   Widget build(BuildContext context) {
@@ -945,6 +1134,8 @@ class _PastQuestionResultCard extends StatelessWidget {
                   onSelected: (value) {
                     if (value == 'view') onView();
                     if (value == 'download') onDownload();
+                    if (value == 'ai') onStudyWithAi();
+                    if (value == 'share') onShare();
                   },
                   itemBuilder: (context) => const [
                     PopupMenuItem(
@@ -964,6 +1155,26 @@ class _PastQuestionResultCard extends StatelessWidget {
                           Icon(Icons.download_rounded),
                           SizedBox(width: 8),
                           Text('Download'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'ai',
+                      child: Row(
+                        children: [
+                          Icon(Icons.auto_awesome_rounded),
+                          SizedBox(width: 8),
+                          Text('Study with RegentAI'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'share',
+                      child: Row(
+                        children: [
+                          Icon(Icons.ios_share_rounded),
+                          SizedBox(width: 8),
+                          Text('Share'),
                         ],
                       ),
                     ),
@@ -1002,6 +1213,18 @@ class _PastQuestionResultCard extends StatelessWidget {
                   icon: const Icon(Icons.download_rounded),
                   label: const Text('Download'),
                 ),
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: 'Study with RegentAI',
+                  onPressed: onStudyWithAi,
+                  icon: const Icon(Icons.auto_awesome_rounded),
+                  color: RegentColors.violet,
+                ),
+                IconButton(
+                  tooltip: 'Share',
+                  onPressed: onShare,
+                  icon: const Icon(Icons.ios_share_rounded),
+                ),
               ],
             ),
           ],
@@ -1034,8 +1257,7 @@ class AcademicCalendarScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final academicYear =
-        '${DateTime.now().year}/${DateTime.now().year + 1} Academic Year';
+    const academicYear = '2026/2027 Academic Year';
     final events = _academicTimelineEvents();
 
     return Scaffold(
@@ -1074,6 +1296,46 @@ class AcademicCalendarScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+          Card(
+            elevation: 0,
+            color: RegentColors.violet.withOpacity(0.08),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+              side: BorderSide(color: RegentColors.violet.withOpacity(0.16)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.schedule_rounded, color: RegentColors.violet),
+                      SizedBox(width: 10),
+                      Text('First-semester teaching timetable',
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Select your faculty, programme and level to see the published classes that match your registered courses.',
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AcademicTimetableScreen(),
+                      ),
+                    ),
+                    icon: const Icon(Icons.visibility_rounded),
+                    label: const Text('View my timetable'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           ...events.map(
             (event) => _TimelineCard(
               title: event.title,
@@ -1089,6 +1351,184 @@ class AcademicCalendarScreen extends StatelessWidget {
   }
 }
 
+class AcademicTimetableScreen extends StatefulWidget {
+  const AcademicTimetableScreen({super.key});
+
+  @override
+  State<AcademicTimetableScreen> createState() => _AcademicTimetableScreenState();
+}
+
+class _AcademicTimetableScreenState extends State<AcademicTimetableScreen> {
+  FacultyData? _faculty;
+  ProgramData? _program;
+  int? _level;
+  bool _profileLoaded = false;
+
+  List<TimetableEntry> get _entries {
+    if (_program == null || _level == null) return const <TimetableEntry>[];
+    return timetableForSelection(program: _program!, level: _level!, semester: 1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return const Scaffold(body: Center(child: Text('Please sign in to view your timetable.')));
+    }
+    return Scaffold(
+      appBar: AppBar(title: const Text('My Teaching Timetable')),
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+        builder: (context, snapshot) {
+          _loadProfile(snapshot.data?.data() ?? const <String, dynamic>{});
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              _banner(
+                context,
+                title: '2026/2027 First Semester',
+                subtitle: 'Published teaching timetable. Teaching: 24 August–27 November 2026; examinations: 7–18 December 2026.',
+                icon: Icons.schedule_rounded,
+              ),
+              const SizedBox(height: 16),
+              _buildTimetableFilters(),
+              const SizedBox(height: 16),
+              _buildSchedule(),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTimetableFilters() {
+    final programs = _faculty?.programs ?? const <ProgramData>[];
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            DropdownButtonFormField<FacultyData>(
+              value: _faculty,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Faculty', prefixIcon: Icon(Icons.account_balance_rounded)),
+              items: universityFaculties.map((faculty) => DropdownMenuItem(value: faculty, child: Text(faculty.name, overflow: TextOverflow.ellipsis))).toList(),
+              onChanged: (value) => setState(() {
+                _faculty = value;
+                _program = null;
+                _level = null;
+              }),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<ProgramData>(
+              value: _program,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Programme', prefixIcon: Icon(Icons.school_rounded)),
+              items: programs.map((program) => DropdownMenuItem(value: program, child: Text(program.name, overflow: TextOverflow.ellipsis))).toList(),
+              onChanged: _faculty == null ? null : (value) => setState(() {
+                    _program = value;
+                    _level = null;
+                  }),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<int>(
+              value: _level,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Level', prefixIcon: Icon(Icons.stairs_rounded)),
+              items: const [100, 200, 300, 400].map((level) => DropdownMenuItem(value: level, child: Text('Level $level'))).toList(),
+              onChanged: _program == null ? null : (value) => setState(() => _level = value),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSchedule() {
+    if (_program == null || _level == null) {
+      return const _EmptyStateCard(
+        icon: Icons.tune_rounded,
+        title: 'Choose your academic details',
+        subtitle: 'Select your faculty, programme and level to view matching first-semester classes.',
+      );
+    }
+    final entries = _entries;
+    final publishedCourses = _program!.courses.where((course) => course.level == _level && course.semester == 1).length;
+    if (entries.isEmpty) {
+      return _EmptyStateCard(
+        icon: Icons.event_busy_rounded,
+        title: 'No published class slots matched yet',
+        subtitle: '$publishedCourses first-semester course(s) are in the curriculum, but this timetable source has no matching class slot for the selected programme. Check with your department for revisions.',
+      );
+    }
+    final grouped = <String, List<TimetableEntry>>{};
+    for (final entry in entries) {
+      grouped.putIfAbsent(entry.day, () => <TimetableEntry>[]).add(entry);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader('Your scheduled classes', '${entries.length} published class slot(s) matched to ${_program!.name}.'),
+        const SizedBox(height: 12),
+        ...grouped.entries.map((day) => Card(
+              elevation: 0,
+              margin: const EdgeInsets.only(bottom: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: ExpansionTile(
+                initiallyExpanded: day.key == 'Monday',
+                leading: const Icon(Icons.calendar_today_rounded, color: RegentColors.violet),
+                title: Text(day.key, style: const TextStyle(fontWeight: FontWeight.w800)),
+                subtitle: Text('${day.value.length} class slot(s)'),
+                children: day.value.map((entry) => ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        decoration: BoxDecoration(color: RegentColors.violet.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                        child: Text(entry.time, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: RegentColors.violet)),
+                      ),
+                      title: Text(entry.courseCode, style: const TextStyle(fontWeight: FontWeight.w800)),
+                      subtitle: Text(
+                        _cleanTimetableText(entry.details),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    )).toList(),
+              ),
+            )),
+      ],
+    );
+  }
+
+  void _loadProfile(Map<String, dynamic> data) {
+    if (_profileLoaded) return;
+    _profileLoaded = true;
+    final hints = [data['program'], data['faculty'], data['department']]
+        .whereType<Object>()
+        .map((value) => value.toString().toLowerCase())
+        .toList();
+    final profileLevel = int.tryParse(data['level']?.toString() ?? '');
+    for (final faculty in universityFaculties) {
+      for (final program in faculty.programs) {
+        if (hints.any((hint) => hint.contains(program.name.toLowerCase()) || program.name.toLowerCase().contains(hint))) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() {
+              _faculty = faculty;
+              _program = program;
+              _level = profileLevel;
+            });
+          });
+          return;
+        }
+      }
+    }
+  }
+
+  String _cleanTimetableText(String text) => text
+      .replaceAll('â€“', '–')
+      .replaceAll('â€¦', '…');
+}
+
 class AcademicCourseInfoScreen extends StatefulWidget {
   const AcademicCourseInfoScreen({super.key});
 
@@ -1099,11 +1539,37 @@ class AcademicCourseInfoScreen extends StatefulWidget {
 
 class _AcademicCourseInfoScreenState extends State<AcademicCourseInfoScreen> {
   final _service = PastQuestionsService();
+  final _searchController = TextEditingController();
   FacultyData? _faculty;
   ProgramData? _program;
   int? _level;
   int _semester = 1;
   String _search = '';
+
+  List<CourseData> get _selectedCourses {
+    final program = _program;
+    final level = _level;
+    if (program == null || level == null) return const <CourseData>[];
+    return program.courses
+        .where((course) => course.level == level && course.semester == _semester)
+        .toList(growable: false);
+  }
+
+  List<CourseData> get _matchingCourses {
+    final query = _search.trim().toLowerCase();
+    if (query.isEmpty) return _selectedCourses;
+    return _selectedCourses
+        .where((course) =>
+            course.code.toLowerCase().contains(query) ||
+            course.name.toLowerCase().contains(query))
+        .toList(growable: false);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1168,6 +1634,7 @@ class _AcademicCourseInfoScreenState extends State<AcademicCourseInfoScreen> {
                           _level = null;
                           _semester = 1;
                           _search = '';
+                          _searchController.clear();
                         }),
                       ),
                       const SizedBox(height: 12),
@@ -1196,6 +1663,7 @@ class _AcademicCourseInfoScreenState extends State<AcademicCourseInfoScreen> {
                                   _level = null;
                                   _semester = 1;
                                   _search = '';
+                                  _searchController.clear();
                                 }),
                       ),
                       const SizedBox(height: 12),
@@ -1235,11 +1703,35 @@ class _AcademicCourseInfoScreenState extends State<AcademicCourseInfoScreen> {
                       ),
                       const SizedBox(height: 12),
                       TextField(
-                        decoration: const InputDecoration(
-                          labelText: 'Search course title',
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          labelText: 'Search course title or code',
+                          hintText: 'For example: programming, SICS 1573',
                           prefixIcon: Icon(Icons.search_rounded),
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_searchController.text.isNotEmpty)
+                                IconButton(
+                                  tooltip: 'Clear search',
+                                  onPressed: () => setState(() {
+                                    _searchController.clear();
+                                    _search = '';
+                                  }),
+                                  icon: const Icon(Icons.clear_rounded),
+                                ),
+                              IconButton(
+                                tooltip: 'Search courses',
+                                onPressed: () => setState(() {
+                                  _search = _searchController.text.trim();
+                                }),
+                                icon: const Icon(Icons.search_rounded),
+                              ),
+                            ],
+                          ),
                         ),
                         onChanged: (value) => setState(() => _search = value),
+                        onSubmitted: (value) => setState(() => _search = value.trim()),
                       ),
                     ],
                   ),
@@ -1257,42 +1749,44 @@ class _AcademicCourseInfoScreenState extends State<AcademicCourseInfoScreen> {
                   ),
                   builder: (context, snapshot) {
                     final questions = snapshot.data ?? const [];
-                    final titles = questions
-                        .map((question) => question.courseName)
-                        .where((value) => value.trim().isNotEmpty)
-                        .toSet()
-                        .toList()
-                      ..sort();
+                    final courses = _matchingCourses;
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _sectionHeader(
                           'Available titles',
-                          'These titles are drawn from uploaded past questions and lecture resources.',
+                          'Courses are drawn from the official programme curriculum for your selected level and term.',
                         ),
                         const SizedBox(height: 10),
-                        if (titles.isEmpty)
-                          const _EmptyStateCard(
+                        if (courses.isEmpty)
+                          _EmptyStateCard(
                             icon: Icons.search_off_rounded,
-                            title: 'No titles found yet',
-                            subtitle:
-                                'Try a broader search or upload the first academic file for this course.',
+                            title: _search.trim().isEmpty
+                                ? 'No curriculum has been added for this selection'
+                                : 'No related course found',
+                            subtitle: _search.trim().isEmpty
+                                ? 'Choose another level or term, or ask your department to publish the missing curriculum.'
+                                : 'Try part of the course code or title, such as “programming” or “SICS”.',
                           )
                         else
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: titles
-                                .map(
-                                  (title) => ActionChip(
-                                    label: Text(title),
-                                    onPressed: () {
-                                      setState(() => _search = title);
-                                    },
-                                  ),
-                                )
-                                .toList(),
+                          ...courses.map(
+                            (course) => Card(
+                              elevation: 0,
+                              margin: const EdgeInsets.only(bottom: 10),
+                              child: ListTile(
+                                leading: const Icon(Icons.menu_book_rounded,
+                                    color: RegentColors.violet),
+                                title: Text(course.name,
+                                    style: const TextStyle(fontWeight: FontWeight.w800)),
+                                subtitle: Text('${course.code} · ${course.creditHours} credit hours${course.isElective ? ' · Elective' : ''}'),
+                                trailing: FilledButton.tonalIcon(
+                                  onPressed: () => _openCourseQuestions(course),
+                                  icon: const Icon(Icons.visibility_rounded),
+                                  label: const Text('Questions'),
+                                ),
+                              ),
+                            ),
                           ),
                         const SizedBox(height: 16),
                         _sectionHeader(
@@ -1304,22 +1798,17 @@ class _AcademicCourseInfoScreenState extends State<AcademicCourseInfoScreen> {
                           children: [
                             Expanded(
                               child: FilledButton.icon(
-                                onPressed: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ViewPastQuestionsScreen(
-                                      facultyName: _faculty!.name,
-                                      programName: _program!.name,
-                                      option: null,
-                                      level: _level!,
-                                      semester: _semester,
-                                      courseTitleQuery:
-                                          _search.trim().isEmpty ? null : _search,
-                                    ),
-                                  ),
-                                ),
+                                onPressed: courses.isEmpty
+                                    ? null
+                                    : () => _openCourseQuestions(
+                                          courses.length == 1
+                                              ? courses.first
+                                              : null,
+                                        ),
                                 icon: const Icon(Icons.visibility_rounded),
-                                label: const Text('Open questions'),
+                                label: Text(courses.length == 1
+                                    ? 'Open questions'
+                                    : 'Open matching questions'),
                               ),
                             ),
                           ],
@@ -1334,7 +1823,7 @@ class _AcademicCourseInfoScreenState extends State<AcademicCourseInfoScreen> {
                           faculty: _faculty!.name,
                           program: _program!.name,
                           level: _level!,
-                          courseCount: titles.length,
+                          courseCount: courses.length,
                           questionCount: questions.length,
                         ),
                       ],
@@ -1397,6 +1886,24 @@ class _AcademicCourseInfoScreenState extends State<AcademicCourseInfoScreen> {
       });
     }
   }
+
+  void _openCourseQuestions(CourseData? course) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ViewPastQuestionsScreen(
+          facultyName: _faculty!.name,
+          programName: _program!.name,
+          option: null,
+          level: _level!,
+          semester: _semester,
+          termLabel: 'Semester',
+          courseTitleQuery: course?.name ??
+              (_search.trim().isEmpty ? null : _search.trim()),
+        ),
+      ),
+    );
+  }
 }
 
 class AcademicResultsScreen extends StatefulWidget {
@@ -1406,16 +1913,26 @@ class AcademicResultsScreen extends StatefulWidget {
   State<AcademicResultsScreen> createState() => _AcademicResultsScreenState();
 }
 
+enum _TranscriptScope { selectedCourse, selectedSemester, fullRecord }
+
 class _AcademicResultsScreenState extends State<AcademicResultsScreen> {
   final _service = AcademicResultsService();
   final _searchController = TextEditingController();
+  final _studentIdController = TextEditingController();
+  final _transcriptPdfService = TranscriptPdfService();
   int? _selectedLevel;
   int? _selectedTerm;
+  String? _selectedCourseCode;
+  _TranscriptScope _transcriptScope = _TranscriptScope.selectedSemester;
   bool _bootstrapped = false;
+  bool _identityVerified = false;
+  String? _accessError;
+  bool _generatingTranscript = false;
 
   @override
   void dispose() {
     _searchController.dispose();
+    _studentIdController.dispose();
     super.dispose();
   }
 
@@ -1453,6 +1970,10 @@ class _AcademicResultsScreenState extends State<AcademicResultsScreen> {
             });
           }
 
+          if (!_identityVerified) {
+            return _buildTranscriptAccessGate(userData);
+          }
+
           return StreamBuilder<List<AcademicResultModel>>(
             stream: _service.watchStudentResults(studentId: currentUser.uid),
             builder: (context, snapshot) {
@@ -1469,15 +1990,63 @@ class _AcademicResultsScreenState extends State<AcademicResultsScreen> {
                   .where((result) => levels.contains(result.level))
                   .toList();
               final cgpa = _service.calculateGpa(levelResults);
+              final publishedResultNames = allResults
+                  .map((result) => result.studentName?.trim() ?? '')
+                  .where((name) => name.isNotEmpty)
+                  .toList();
+              final transcriptNameMatches = allResults.isEmpty ||
+                  (publishedResultNames.isNotEmpty &&
+                      publishedResultNames.every(
+                        (name) =>
+                            _normalizedName(name) ==
+                            _normalizedName(
+                              userData['fullName']?.toString() ?? '',
+                            ),
+                      ));
+              if (!transcriptNameMatches) {
+                return ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    _banner(
+                      context,
+                      title: 'Results access is protected',
+                      subtitle:
+                          'Your verified profile does not match the published student record.',
+                      icon: Icons.security_rounded,
+                    ),
+                    const SizedBox(height: 16),
+                    const _EmptyStateCard(
+                      icon: Icons.lock_rounded,
+                      title: 'Academic Unit review required',
+                      subtitle:
+                          'Results and transcripts stay unavailable until your student ID and full name are confirmed against the published record.',
+                    ),
+                  ],
+                );
+              }
+              final courseOptions = allResults
+                  .where((result) =>
+                      result.level == selectedLevel &&
+                      result.semester == selectedTerm)
+                  .map((result) => result.courseCode)
+                  .where((value) => value.trim().isNotEmpty)
+                  .toSet()
+                  .toList()
+                ..sort();
+              final courseFilteredResults = _selectedCourseCode == null
+                  ? selectedResults
+                  : selectedResults
+                      .where((result) => result.courseCode == _selectedCourseCode)
+                      .toList();
 
               return ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
                   _banner(
                     context,
-                    title: 'See the grades you have earned so far',
+                    title: 'Results & secure transcript',
                     subtitle:
-                        'Results are grouped by level and term, with missing submissions clearly marked as awaiting approval.',
+                        'Your identity is verified. Review published grades, then print or download your provisional transcript.',
                     icon: Icons.grade_rounded,
                   ),
                   const SizedBox(height: 16),
@@ -1551,6 +2120,38 @@ class _AcademicResultsScreenState extends State<AcademicResultsScreen> {
                             ),
                             onChanged: (_) => setState(() {}),
                           ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String?>(
+                            value: _selectedCourseCode,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Course (optional)',
+                              prefixIcon: Icon(Icons.menu_book_rounded),
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('All courses'),
+                              ),
+                          ...courseOptions.map(
+                            (code) => DropdownMenuItem<String?>(
+                              value: code,
+                              child: Text(code),
+                            ),
+                          ),
+                        ],
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedCourseCode = value;
+                                if (value == null &&
+                                    _transcriptScope ==
+                                        _TranscriptScope.selectedCourse) {
+                                  _transcriptScope =
+                                      _TranscriptScope.selectedSemester;
+                                }
+                              });
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -1564,12 +2165,36 @@ class _AcademicResultsScreenState extends State<AcademicResultsScreen> {
                     termLabel: termLabel,
                   ),
                   const SizedBox(height: 16),
+                  _buildTranscriptCard(
+                    userData: userData,
+                    currentLevel: currentLevel,
+                    selectedLevel: selectedLevel,
+                    selectedTerm: selectedTerm,
+                    termLabel: termLabel,
+                    selectedCourseResults: _selectedCourseCode == null
+                        ? const []
+                        : allResults
+                            .where(
+                              (result) =>
+                                  result.level == selectedLevel &&
+                                  result.semester == selectedTerm &&
+                                  result.courseCode == _selectedCourseCode,
+                            )
+                            .toList(),
+                    semesterResults: _service.filterResults(
+                      results: allResults,
+                      level: selectedLevel,
+                      semester: selectedTerm,
+                    ),
+                    fullResults: levelResults,
+                  ),
+                  const SizedBox(height: 16),
                   _sectionHeader(
                     'Selected term results',
                     'Everything submitted for the chosen level and term appears here.',
                   ),
                   const SizedBox(height: 10),
-                  if (selectedResults.isEmpty)
+                  if (courseFilteredResults.isEmpty)
                     const _EmptyStateCard(
                       icon: Icons.pending_actions_rounded,
                       title: 'Awaiting academic board submission',
@@ -1577,7 +2202,7 @@ class _AcademicResultsScreenState extends State<AcademicResultsScreen> {
                           'No results have been published for the selected level and term yet.',
                     )
                   else
-                    ...selectedResults.map(
+                    ...courseFilteredResults.map(
                       (result) => _ResultCard(result: result),
                     ),
                   const SizedBox(height: 20),
@@ -1625,6 +2250,225 @@ class _AcademicResultsScreenState extends State<AcademicResultsScreen> {
       }
     });
   }
+
+  Widget _buildTranscriptAccessGate(Map<String, dynamic> userData) {
+    final linkedStudentId = _linkedStudentId(userData);
+    final fullName = userData['fullName']?.toString().trim() ?? '';
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _banner(
+          context,
+          title: 'Secure results and transcripts',
+          subtitle: 'Enter the student ID linked to your RegentConnect profile before viewing published grades or generating a transcript.',
+          icon: Icons.verified_user_rounded,
+        ),
+        const SizedBox(height: 16),
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Verify student record', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 6),
+                Text(
+                  linkedStudentId.isEmpty
+                      ? 'Your student ID is not linked to this account yet. Ask the Academic Unit to update your profile before requesting a transcript.'
+                      : 'For privacy, type your student ID exactly as it appears on your official record. Your full name must also agree with the published transcript record.',
+                  style: TextStyle(color: Colors.grey.shade700, height: 1.35),
+                ),
+                const SizedBox(height: 18),
+                TextField(
+                  controller: _studentIdController,
+                  enabled: linkedStudentId.isNotEmpty,
+                  decoration: const InputDecoration(
+                    labelText: 'Student ID / Index number',
+                    prefixIcon: Icon(Icons.badge_outlined),
+                  ),
+                  onSubmitted: (_) => _verifyTranscriptAccess(userData),
+                ),
+                if (_accessError != null) ...[
+                  const SizedBox(height: 10),
+                  Text(_accessError!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+                ],
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: linkedStudentId.isEmpty ? null : () => _verifyTranscriptAccess(userData),
+                    icon: const Icon(Icons.lock_open_rounded),
+                    label: const Text('Verify and access results'),
+                  ),
+                ),
+                if (fullName.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text('Profile name: $fullName', style: TextStyle(color: Colors.grey.shade600)),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTranscriptCard({
+    required Map<String, dynamic> userData,
+    required int currentLevel,
+    required int selectedLevel,
+    required int selectedTerm,
+    required String termLabel,
+    required List<AcademicResultModel> selectedCourseResults,
+    required List<AcademicResultModel> semesterResults,
+    required List<AcademicResultModel> fullResults,
+  }) {
+    final scopeResults = switch (_transcriptScope) {
+      _TranscriptScope.selectedCourse => selectedCourseResults,
+      _TranscriptScope.selectedSemester => semesterResults,
+      _TranscriptScope.fullRecord => fullResults,
+    };
+    final scopeLabel = switch (_transcriptScope) {
+      _TranscriptScope.selectedCourse => _selectedCourseCode ?? 'Selected course',
+      _TranscriptScope.selectedSemester => 'Level $selectedLevel · $termLabel $selectedTerm',
+      _TranscriptScope.fullRecord => 'Level 100 to Level $currentLevel',
+    };
+    return Card(
+      elevation: 0,
+      color: RegentColors.violet.withOpacity(0.08),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: RegentColors.violet.withOpacity(0.18))),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(children: [Icon(Icons.picture_as_pdf_rounded, color: RegentColors.violet), SizedBox(width: 10), Text('Provisional transcript', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800))]),
+            const SizedBox(height: 7),
+            const Text('Generate a professional two-page transcript based on your verified student record. It includes course marks, grades, credit hours, semester averages, CWA and the grading key.'),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('Selected course'),
+                  selected:
+                      _transcriptScope == _TranscriptScope.selectedCourse,
+                  onSelected: _selectedCourseCode == null
+                      ? null
+                      : (_) => setState(
+                            () => _transcriptScope =
+                                _TranscriptScope.selectedCourse,
+                          ),
+                ),
+                ChoiceChip(
+                  label: Text('Whole $termLabel'),
+                  selected:
+                      _transcriptScope == _TranscriptScope.selectedSemester,
+                  onSelected: (_) => setState(
+                    () => _transcriptScope =
+                        _TranscriptScope.selectedSemester,
+                  ),
+                ),
+                ChoiceChip(
+                  label: const Text('Level 100 to current'),
+                  selected: _transcriptScope == _TranscriptScope.fullRecord,
+                  onSelected: (_) => setState(
+                    () => _transcriptScope = _TranscriptScope.fullRecord,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              _selectedCourseCode == null &&
+                      _transcriptScope == _TranscriptScope.selectedCourse
+                  ? 'Choose a specific course in the result filters to enable this scope.'
+                  : '$scopeLabel · ${scopeResults.length} published result(s)',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: scopeResults.isEmpty || _generatingTranscript
+                    ? null
+                    : () => _prepareTranscript(userData, scopeResults, scopeLabel),
+                icon: _generatingTranscript ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.print_rounded),
+                label: Text(_generatingTranscript ? 'Preparing transcript...' : 'Print or download PDF'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _verifyTranscriptAccess(Map<String, dynamic> userData) {
+    final linkedId = _linkedStudentId(userData);
+    if (linkedId.isEmpty || _normalizedId(linkedId) != _normalizedId(_studentIdController.text)) {
+      setState(() => _accessError = 'The student ID does not match the student record linked to this account.');
+      return;
+    }
+    final name = userData['fullName']?.toString().trim() ?? '';
+    if (name.isEmpty) {
+      setState(() => _accessError = 'Your profile name is missing. Ask the Academic Unit to update your record before requesting a transcript.');
+      return;
+    }
+    setState(() {
+      _identityVerified = true;
+      _accessError = null;
+    });
+  }
+
+  Future<void> _prepareTranscript(Map<String, dynamic> userData, List<AcademicResultModel> results, String scopeLabel) async {
+    setState(() => _generatingTranscript = true);
+    try {
+      final bytes = await _transcriptPdfService.buildTranscript(
+        studentId: _linkedStudentId(userData),
+        studentName: userData['fullName']?.toString().trim() ?? '',
+        programName: userData['program']?.toString().trim() ?? 'Programme not specified',
+        facultyName: userData['faculty']?.toString().trim() ?? 'Regent University College of Science and Technology',
+        results: results,
+        generatedAt: DateTime.now(),
+        scopeLabel: scopeLabel,
+      );
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        builder: (context) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.verified_rounded, size: 42, color: RegentColors.violet),
+              const SizedBox(height: 10),
+              const Text('Transcript PDF is ready', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              const Text('Print it now or download a copy for your records.', textAlign: TextAlign.center),
+              const SizedBox(height: 18),
+              Row(children: [
+                Expanded(child: OutlinedButton.icon(onPressed: () => _transcriptPdfService.print(bytes), icon: const Icon(Icons.print_outlined), label: const Text('Print'))),
+                const SizedBox(width: 12),
+                Expanded(child: FilledButton.icon(onPressed: () => _transcriptPdfService.download(bytes, 'regent-transcript-${_linkedStudentId(userData)}.pdf'), icon: const Icon(Icons.download_rounded), label: const Text('Download'))),
+              ]),
+            ]),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not prepare transcript: $error')));
+    } finally {
+      if (mounted) setState(() => _generatingTranscript = false);
+    }
+  }
+
+  String _linkedStudentId(Map<String, dynamic> userData) =>
+      (userData['studentId'] ?? userData['indexNumber'] ?? userData['indexNo'])?.toString().trim() ?? '';
+  String _normalizedId(String value) => value.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+  String _normalizedName(String value) => value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
 }
 
 class AcademicSupportScreen extends StatelessWidget {
@@ -1650,7 +2494,7 @@ class AcademicSupportScreen extends StatelessWidget {
             'Tap an office to open its verified profile and chat directly.',
           ),
           const SizedBox(height: 10),
-          ...OfficialAccounts.accounts.map(
+          ...OfficialAccounts.administrativeAccounts.map(
             (official) => _OfficialOfficeCard(
               official: official,
               onTap: () {
@@ -1666,6 +2510,41 @@ class AcademicSupportScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
+          _sectionHeader(
+            'Faculty HoDs',
+            'Each programme is routed to its faculty HoD. Ask about courses, programme changes or any faculty concern through a verified shared inbox.',
+          ),
+          const SizedBox(height: 12),
+          for (final faculty in universityFaculties) ...[
+            if (OfficialAccounts.facultyHeadsForSchool(faculty.name)
+                .isNotEmpty) ...[
+              Text(
+                faculty.name,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...OfficialAccounts.facultyHeadsForSchool(faculty.name).map(
+                (official) => _OfficialOfficeCard(
+                  official: official,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => OfficialAccountProfileScreen(
+                          account: official.toDirectoryMap(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+          ],
+          const SizedBox(height: 10),
           _sectionHeader(
             'School contacts and online services',
             'Useful details students often need during the semester.',
@@ -1924,43 +2803,48 @@ class _AcademicCalendarEvent {
 }
 
 List<_AcademicCalendarEvent> _academicTimelineEvents() {
-  final now = DateTime.now();
-  final month = DateFormat('MMM').format(now);
   return [
     _AcademicCalendarEvent(
-      title: 'Registration and clearance',
-      subtitle: 'Fee confirmation, registration checks and course advising.',
-      dateRange: '$month - First 2 weeks',
+      title: 'First semester teaching begins',
+      subtitle: 'Published regular-stream teaching timetables begin. Complete registration and confirm your course schedule on Cyber Campus.',
+      dateRange: 'Monday, 24 August 2026',
       icon: Icons.assignment_turned_in_rounded,
       accent: RegentColors.violet,
     ),
     _AcademicCalendarEvent(
-      title: 'Lecture period',
-      subtitle: 'Regular classes, seminar discussions and course consultations.',
-      dateRange: '$month - Mid term',
+      title: 'Teaching period',
+      subtitle: 'Scheduled lectures, practicals, consultations and continuous assessment across the published first-semester timetable.',
+      dateRange: '24 August – 27 November 2026',
       icon: Icons.menu_book_rounded,
       accent: RegentColors.green,
     ),
     _AcademicCalendarEvent(
-      title: 'Mid-semester review',
-      subtitle: 'Assignments, quizzes and continuous assessment checkpoints.',
-      dateRange: '$month - Review week',
+      title: 'Revision and assessment preparation',
+      subtitle: 'Use the final teaching week to complete course requirements and prepare for end-of-semester examinations.',
+      dateRange: '28 November – 6 December 2026',
       icon: Icons.fact_check_rounded,
       accent: Colors.orange,
     ),
     _AcademicCalendarEvent(
-      title: 'Examinations',
-      subtitle: 'Final papers and practical assessments for the semester.',
-      dateRange: '$month - Examination week',
+      title: 'First semester examinations',
+      subtitle: 'Published examination window for the 2026/2027 first semester.',
+      dateRange: '7 – 18 December 2026',
       icon: Icons.edit_note_rounded,
       accent: Colors.red,
     ),
     _AcademicCalendarEvent(
-      title: 'Results release',
-      subtitle: 'Academic board release and grade publication.',
-      dateRange: '$month - After board approval',
+      title: 'Vacation',
+      subtitle: 'Semester break following the examination period.',
+      dateRange: '18 December 2026 – 1 January 2027',
       icon: Icons.verified_rounded,
       accent: Colors.blue,
+    ),
+    _AcademicCalendarEvent(
+      title: 'Next semester reopens',
+      subtitle: 'Students return for the next semester and should confirm new course and timetable updates.',
+      dateRange: 'Monday, 4 January 2027',
+      icon: Icons.restart_alt_rounded,
+      accent: RegentColors.violet,
     ),
   ];
 }

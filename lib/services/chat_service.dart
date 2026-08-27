@@ -45,20 +45,62 @@ class ChatService {
   }
 
   Future<void> ensureChatRoom(String otherUserId) async {
-    if (currentUserId.isEmpty || otherUserId.isEmpty) return;
+    if (currentUserId.isEmpty) {
+      throw Exception('Sign in before opening a conversation.');
+    }
+    if (otherUserId.isEmpty || otherUserId == currentMessagingId) {
+      throw Exception('Choose another user to start a conversation.');
+    }
     final otherUser = await getUserData(otherUserId);
+    if (otherUser == null) {
+      throw Exception('This user is no longer available for messaging.');
+    }
+    final recipientIdentity =
+        (otherUser['chatIdentity'] ?? otherUser['uid'] ?? otherUserId)
+            .toString();
+    if (recipientIdentity != otherUserId) {
+      throw Exception('The selected user has an invalid chat identity.');
+    }
+    final recipientAuthId =
+        (otherUser['authUid'] ??
+                (OfficialAccounts.isOfficialIdentity(otherUserId)
+                    ? null
+                    : otherUserId))
+            ?.toString();
+    final chatReference =
+        _firestore.collection(AppConstants.chatsCollection).doc(getChatRoomId(otherUserId));
+    final existingChat = await chatReference.get();
+    final existingParticipantAuthIds = existingChat.exists
+        ? List<String>.from(
+            existingChat.data()?['participantAuthIds'] ?? const [],
+          )
+        : const <String>[];
     final participantAuthIds = <String>{
+      ...existingParticipantAuthIds,
       currentUserId,
-      if (otherUser?['authUid'] != null) otherUser!['authUid'].toString(),
-    }.toList();
-    await _firestore
-        .collection(AppConstants.chatsCollection)
-        .doc(getChatRoomId(otherUserId))
-        .set({
-      'participants': [currentMessagingId, otherUserId],
+      if (recipientAuthId != null && recipientAuthId.isNotEmpty)
+        recipientAuthId,
+    }.toList()
+      ..sort();
+    final requestedParticipants = [currentMessagingId, otherUserId]..sort();
+    final existingParticipants = existingChat.exists
+        ? List<String>.from(existingChat.data()?['participants'] ?? const [])
+        : null;
+    if (existingParticipants != null &&
+        (existingParticipants.length != 2 ||
+            !existingParticipants.toSet().containsAll(requestedParticipants))) {
+      throw Exception('This conversation has invalid participants.');
+    }
+    await chatReference.set({
+      'participants': existingParticipants ?? requestedParticipants,
       'participantAuthIds': participantAuthIds,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
+    final chat = await chatReference.get();
+    if (!chat.exists) {
+      throw Exception('The conversation could not be created. Please try again.');
+    }
   }
 
   // Send a text message - updated with reply support
@@ -140,7 +182,6 @@ class ChatService {
     batch.set(
       chatReference,
       {
-        'participants': [currentMessagingId, receiverId],
         'lastMessage': message.trim(),
         'lastMessageType': type,
         'lastMessageTime': timestamp,
@@ -268,6 +309,41 @@ class ChatService {
       'deletedByName': userName,
       'deletedAt': FieldValue.serverTimestamp(),
       'deletedForMe': true,
+    });
+  }
+
+  Future<void> editTextMessage({
+    required String otherUserId,
+    required String messageId,
+    required String message,
+  }) async {
+    final trimmedMessage = message.trim();
+    if (trimmedMessage.isEmpty) {
+      throw Exception('A message cannot be empty.');
+    }
+
+    final reference = _firestore
+        .collection(AppConstants.chatsCollection)
+        .doc(getChatRoomId(otherUserId))
+        .collection('messages')
+        .doc(messageId);
+    final snapshot = await reference.get();
+    final data = snapshot.data();
+    final createdAt = data?['timestamp'];
+    if (!snapshot.exists ||
+        data?['senderAuthId'] != currentUserId ||
+        data?['type'] != 'text' ||
+        data?['isDeleted'] == true ||
+        createdAt is! Timestamp ||
+        DateTime.now().difference(createdAt.toDate()) >
+            const Duration(minutes: 10)) {
+      throw Exception('Text messages can only be edited within 10 minutes.');
+    }
+
+    await reference.update({
+      'message': trimmedMessage,
+      'content': trimmedMessage,
+      'editedAt': FieldValue.serverTimestamp(),
     });
   }
 

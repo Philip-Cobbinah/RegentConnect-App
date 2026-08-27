@@ -118,12 +118,17 @@ class AIChatStorageService {
         _firestore = firestore ?? FirebaseFirestore.instance,
         _storage = storage ?? FirebaseStorage.instance;
 
-  static const String _storageKey = 'regent_ai_chat_history';
+  static const String _storageKeyPrefix = 'regent_ai_chat_history_';
   static const String _sessionId = 'default';
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
   final FirebaseStorage _storage;
+
+  String? get _localStorageKey {
+    final uid = _auth.currentUser?.uid;
+    return uid == null || uid.isEmpty ? null : '$_storageKeyPrefix$uid';
+  }
 
   CollectionReference<Map<String, dynamic>> _messagesReference(String uid) =>
       _firestore
@@ -258,7 +263,10 @@ class AIChatStorageService {
 
   Future<void> clearMessages() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_storageKey);
+    final localStorageKey = _localStorageKey;
+    if (localStorageKey != null) {
+      await prefs.remove(localStorageKey);
+    }
 
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
@@ -288,9 +296,11 @@ class AIChatStorageService {
 
   Future<void> _saveLocally(List<AIChatMessage> messages) async {
     try {
+      final localStorageKey = _localStorageKey;
+      if (localStorageKey == null) return;
       final prefs = await SharedPreferences.getInstance();
       final jsonList = messages.map((message) => message.toJson()).toList();
-      await prefs.setString(_storageKey, jsonEncode(jsonList));
+      await prefs.setString(localStorageKey, jsonEncode(jsonList));
     } catch (error) {
       debugPrint('Local AI history save failed: $error');
     }
@@ -298,8 +308,10 @@ class AIChatStorageService {
 
   Future<List<AIChatMessage>> _loadLocally() async {
     try {
+      final localStorageKey = _localStorageKey;
+      if (localStorageKey == null) return [];
       final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_storageKey);
+      final jsonString = prefs.getString(localStorageKey);
       if (jsonString == null || jsonString.isEmpty) return [];
       final jsonList = jsonDecode(jsonString) as List;
       return jsonList

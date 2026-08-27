@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme.dart';
 import '../../../models/past_question_model.dart';
 import '../../../services/past_questions_service.dart';
 import '../../../services/auth_service.dart';
+import '../../ai_bot/screens/regent_ai_screen.dart';
 
 class ViewPastQuestionsScreen extends StatefulWidget {
   final String facultyName;
@@ -226,6 +228,17 @@ class _ViewPastQuestionsScreenState extends State<ViewPastQuestionsScreen> {
             tooltip: 'View',
             onPressed: () => _viewFile(question),
           ),
+          IconButton(
+            icon: const Icon(Icons.auto_awesome_rounded,
+                color: RegentColors.violet),
+            tooltip: 'Study with RegentAI',
+            onPressed: () => _openRegentAi(question),
+          ),
+          IconButton(
+            icon: const Icon(Icons.ios_share_rounded),
+            tooltip: 'Share',
+            onPressed: () => _shareQuestion(question),
+          ),
           if (isOwner)
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
@@ -299,6 +312,25 @@ class _ViewPastQuestionsScreenState extends State<ViewPastQuestionsScreen> {
         );
       }
     }
+  }
+
+  void _openRegentAi(PastQuestionModel question) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RegentAIScreen(
+          initialPrompt:
+              'Help me solve this past question step by step. Course: ${question.courseCode} ${question.courseName}; exam year: ${question.year}. Source file: ${question.fileUrl}\n\nAsk me which question number to start with.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _shareQuestion(PastQuestionModel question) async {
+    await Share.share(
+      'Regent past question: ${question.courseCode} ${question.courseName} (${question.year}).\n${question.fileUrl}',
+      subject: '${question.courseName} past question',
+    );
   }
 
   Future<void> _deleteQuestion(PastQuestionModel question) async {

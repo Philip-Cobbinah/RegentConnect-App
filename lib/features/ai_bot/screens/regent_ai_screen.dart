@@ -12,7 +12,9 @@ import '../../../services/auth_service.dart';
 import '../../../services/ai_chat_storage_service.dart';
 
 class RegentAIScreen extends StatefulWidget {
-  const RegentAIScreen({super.key});
+  final String? initialPrompt;
+
+  const RegentAIScreen({super.key, this.initialPrompt});
 
   @override
   State<RegentAIScreen> createState() => _RegentAIScreenState();
@@ -46,6 +48,10 @@ class _RegentAIScreenState extends State<RegentAIScreen> {
   @override
   void initState() {
     super.initState();
+    final initialPrompt = widget.initialPrompt?.trim();
+    if (initialPrompt != null && initialPrompt.isNotEmpty) {
+      _messageController.text = initialPrompt;
+    }
     _loadChatHistory();
   }
 

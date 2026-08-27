@@ -22,6 +22,11 @@ service cloud.firestore {
         email == 'accounts@regent.edu.gh' ? 'official:finance' :
         email == 'ess@regent.edu.gh' ? 'official:ess-client-assurance' :
         email == 'src@regent.edu.gh' ? 'official:src' :
+        email == 'hod.computing-it@regent.edu.gh' ? 'official:hod-computing-it' :
+        email == 'hod.engineering@regent.edu.gh' ? 'official:hod-engineering' :
+        email == 'hod.business@regent.edu.gh' ? 'official:hod-business' :
+        email == 'hod.arts-sciences@regent.edu.gh' ? 'official:hod-arts-sciences' :
+        email == 'hod.theology-ministry@regent.edu.gh' ? 'official:hod-theology-ministry' :
         null;
     }
 
@@ -198,7 +203,7 @@ service cloud.firestore {
           request.resource.data.message is string &&
           request.resource.data.message.size() <= 10000 &&
           request.resource.data.type in [
-            'text', 'image', 'video', 'audio', 'file', 'poll'
+            'text', 'image', 'video', 'audio', 'file', 'poll', 'sticker'
           ];
         allow update: if participatesIn(chatData(chatId)) &&
           (
@@ -206,13 +211,20 @@ service cloud.firestore {
               'isRead', 'reactions', 'starredBy', 'metadata'
             ]) ||
             (
+              resource.data.senderAuthId == request.auth.uid &&
+              resource.data.type == 'text' &&
+              resource.data.isDeleted == false &&
+              request.time - resource.data.timestamp < duration.value(10, 'm') &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'message', 'content', 'editedAt'
+              ])
+            ) ||
+            (
               (
                 resource.data.senderAuthId == request.auth.uid ||
                 resource.data.senderId == messagingIdentity()
               ) &&
               request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-                'message',
-                'content',
                 'type',
                 'mediaUrl',
                 'mediaStoragePath',
@@ -226,7 +238,6 @@ service cloud.firestore {
                 'deletedBy',
                 'deletedByName',
                 'deletedAt',
-                'editedAt',
                 'reactions',
                 'starredBy',
                 'metadata'
@@ -445,11 +456,15 @@ service cloud.firestore {
         request.resource.data.studentUid == request.auth.uid &&
         request.resource.data.studentId is string &&
         request.resource.data.fullName is string &&
+        request.resource.data.phoneNumber is string &&
         request.resource.data.level is int &&
         request.resource.data.term is int &&
         request.resource.data.termLabel is string &&
         request.resource.data.facultyName is string &&
         request.resource.data.programName is string &&
+        request.resource.data.academicYear is string &&
+        request.resource.data.courses is list &&
+        request.resource.data.recipientLabel is string &&
         request.resource.data.registrationDate is timestamp;
       allow update: if signedIn() &&
         (

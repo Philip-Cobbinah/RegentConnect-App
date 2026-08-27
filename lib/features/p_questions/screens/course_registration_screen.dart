@@ -9,6 +9,7 @@ import '../../../core/programs_data.dart';
 import '../../../core/theme.dart';
 import '../../../models/course_registration_model.dart';
 import '../../../services/course_registration_service.dart';
+import '../../../services/course_registration_pdf_service.dart';
 
 String _resolveSession(String? value) {
   final normalized = value?.trim().toLowerCase() ?? '';
@@ -37,6 +38,8 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
   final _imagePicker = ImagePicker();
   final _studentIdController = TextEditingController();
   final _fullNameController = TextEditingController();
+  final _phoneNumberController = TextEditingController();
+  final _pdfService = CourseRegistrationPdfService();
 
   FacultyData? _selectedFaculty;
   ProgramData? _selectedProgram;
@@ -49,6 +52,7 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
   String? _attachmentContentType;
   bool _bootstrappedProfile = false;
   bool _submitting = false;
+  final Set<String> _selectedCourseKeys = <String>{};
 
   final List<int> _levels = const [100, 200, 300, 400];
   final TextEditingController _dateController = TextEditingController(
@@ -59,6 +63,7 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
   void dispose() {
     _studentIdController.dispose();
     _fullNameController.dispose();
+    _phoneNumberController.dispose();
     _dateController.dispose();
     super.dispose();
   }
@@ -114,6 +119,8 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
                   termOptions: termOptions,
                   programOptions: programOptions,
                 ),
+                const SizedBox(height: 16),
+                _buildSelectedCoursesCard(termLabel),
                 const SizedBox(height: 16),
                 _buildAttachmentCard(context),
                 const SizedBox(height: 16),
@@ -295,6 +302,18 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
                 },
               ),
               const SizedBox(height: 14),
+              TextFormField(
+                controller: _phoneNumberController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Telephone number',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                ),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Enter your telephone number'
+                    : null,
+              ),
+              const SizedBox(height: 14),
               DropdownButtonFormField<FacultyData>(
                 value: _selectedFaculty,
                 decoration: const InputDecoration(
@@ -313,6 +332,7 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
                   setState(() {
                     _selectedFaculty = value;
                     _selectedProgram = null;
+                    _selectedCourseKeys.clear();
                   });
                 },
                 validator: (value) =>
@@ -335,7 +355,10 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
                     .toList(),
                 onChanged: _selectedFaculty == null
                     ? null
-                    : (value) => setState(() => _selectedProgram = value),
+                    : (value) => setState(() {
+                        _selectedProgram = value;
+                        _selectDefaultCourses();
+                      }),
                 validator: (value) =>
                     value == null ? 'Select your program' : null,
               ),
@@ -354,7 +377,10 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
                       ),
                     )
                     .toList(),
-                onChanged: (value) => setState(() => _selectedLevel = value),
+                onChanged: (value) => setState(() {
+                  _selectedLevel = value;
+                  _selectDefaultCourses();
+                }),
                 validator: (value) => value == null ? 'Select your level' : null,
               ),
               const SizedBox(height: 14),
@@ -387,12 +413,91 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
                   return ChoiceChip(
                     label: Text('${_ordinal(term)} $termLabel'),
                     selected: selected,
-                    onSelected: (_) => setState(() => _selectedTerm = term),
+                    onSelected: (_) => setState(() {
+                      _selectedTerm = term;
+                      _selectDefaultCourses();
+                    }),
                   );
                 }).toList(),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  List<CourseData> get _availableCourses {
+    final program = _selectedProgram;
+    final level = _selectedLevel;
+    final term = _selectedTerm;
+    if (program == null || level == null || term == null) {
+      return const <CourseData>[];
+    }
+    return program.courses
+        .where((course) => course.level == level && course.semester == term)
+        .toList(growable: false);
+  }
+
+  void _selectDefaultCourses() {
+    _selectedCourseKeys
+      ..clear()
+      ..addAll(_availableCourses
+          .where((course) => !course.isElective)
+          .map((course) => course.code));
+  }
+
+  List<RegisteredCourse> get _selectedCourses => _availableCourses
+      .where((course) => _selectedCourseKeys.contains(course.code))
+      .map((course) => RegisteredCourse(
+            code: course.code,
+            title: course.name,
+            creditHours: course.creditHours,
+            isElective: course.isElective,
+          ))
+      .toList(growable: false);
+
+  Widget _buildSelectedCoursesCard(String termLabel) {
+    final courses = _availableCourses;
+    final credits = _selectedCourses.fold<int>(
+      0,
+      (total, course) => total + course.creditHours,
+    );
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Automatically selected courses', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 5),
+            Text('Required courses are selected from the official curriculum. You may add or remove electives before you confirm.'),
+            const SizedBox(height: 12),
+            if (_selectedProgram == null || _selectedLevel == null || _selectedTerm == null)
+              const Text('Select a programme, level and semester to load your courses.')
+            else if (courses.isEmpty)
+              Text('No approved $termLabel curriculum is available for this selection yet.')
+            else ...[
+              ...courses.map((course) => CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _selectedCourseKeys.contains(course.code),
+                    onChanged: (checked) => setState(() {
+                      if (checked == true) {
+                        _selectedCourseKeys.add(course.code);
+                      } else {
+                        _selectedCourseKeys.remove(course.code);
+                      }
+                    }),
+                    title: Text('${course.code} · ${course.name}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: Text('${course.creditHours} credit hours${course.isElective ? ' · Elective' : ''}'),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  )),
+              const Divider(),
+              Text('$credits total credit hours', style: const TextStyle(fontWeight: FontWeight.w800)),
+            ],
+          ],
         ),
       ),
     );
@@ -633,6 +738,7 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
 
       final studentId = userData['studentId']?.toString().trim();
       final fullName = userData['fullName']?.toString().trim();
+      final phoneNumber = (userData['phoneNumber'] ?? userData['phone'] ?? userData['telephone'])?.toString().trim();
       final level = int.tryParse(userData['level']?.toString() ?? '');
       final session = _resolveSession(userData['session']?.toString());
       final match = _resolveProfileProgram(userData);
@@ -642,6 +748,9 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
       }
       if (fullName != null && fullName.isNotEmpty) {
         _fullNameController.text = fullName;
+      }
+      if (phoneNumber != null && phoneNumber.isNotEmpty) {
+        _phoneNumberController.text = phoneNumber;
       }
       if (level != null && _levels.contains(level)) {
         _selectedLevel = level;
@@ -657,6 +766,7 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
         _selectedFaculty = match.faculty;
         _selectedProgram = match.program;
       }
+      _selectDefaultCourses();
 
       setState(() {});
     });
@@ -809,6 +919,12 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
       );
       return;
     }
+    if (_selectedCourses.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select at least one course before continuing.')),
+      );
+      return;
+    }
 
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
@@ -843,6 +959,7 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
                 const SizedBox(height: 14),
                 _previewRow('Student ID', _studentIdController.text.trim()),
                 _previewRow('Full name', _fullNameController.text.trim()),
+                _previewRow('Telephone', _phoneNumberController.text.trim()),
                 _previewRow('Faculty', _selectedFaculty!.name),
                 _previewRow('Program', _selectedProgram!.name),
                 _previewRow('Level', 'Level ${_selectedLevel!}'),
@@ -853,6 +970,22 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
                 _previewRow(
                   'Date',
                   MaterialLocalizations.of(context).formatMediumDate(_selectedDate),
+                ),
+                _previewRow('Faculty recipient', _recipientLabel),
+                const SizedBox(height: 8),
+                const Text('Courses to register', style: TextStyle(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 6),
+                ..._selectedCourses.map((course) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text('${course.code} · ${course.title} (${course.creditHours} credits)'),
+                    )),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '${_selectedCourses.fold<int>(0, (total, course) => total + course.creditHours)} total credit hours',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
                 if (_attachmentBytes != null) ...[
                   const SizedBox(height: 12),
@@ -925,9 +1058,11 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
     setState(() => _submitting = true);
     try {
       final termLabel = _termLabelForSession(_academicSession);
+      final pdfBytes = await _buildRegistrationPdf();
       final id = await _service.submitRegistration(
         studentId: _studentIdController.text.trim(),
         fullName: _fullNameController.text.trim(),
+        phoneNumber: _phoneNumberController.text.trim(),
         level: _selectedLevel!,
         term: _selectedTerm!,
         termLabel: termLabel,
@@ -935,6 +1070,10 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
         facultyName: _selectedFaculty!.name,
         programName: _selectedProgram!.name,
         registrationDate: _selectedDate,
+        academicYear: _academicYearFor(_selectedDate),
+        courses: _selectedCourses,
+        recipientLabel: _recipientLabel,
+        registrationPdfBytes: pdfBytes,
         attachmentBytes: _attachmentBytes,
         attachmentName: _attachmentName,
         attachmentContentType: _attachmentContentType,
@@ -942,9 +1081,10 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Course registration submitted successfully. Ref: $id')),
+        SnackBar(content: Text('Registration sent to $_recipientLabel. Ref: $id')),
       );
       _removeAttachment();
+      await _showPdfActions(pdfBytes);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -966,5 +1106,67 @@ class _CourseRegistrationScreenState extends State<CourseRegistrationScreen> {
       default:
         return '${value}th';
     }
+  }
+
+  String get _recipientLabel {
+    if (_selectedProgram == null) return 'Faculty Office';
+    return 'HoD · ${_selectedProgram!.name}';
+  }
+
+  String _academicYearFor(DateTime date) => '${date.year}/${date.year + 1}';
+
+  Future<Uint8List> _buildRegistrationPdf() => _pdfService.buildPdf(
+        studentId: _studentIdController.text.trim(),
+        phoneNumber: _phoneNumberController.text.trim(),
+        fullName: _fullNameController.text.trim(),
+        facultyName: _selectedFaculty!.name,
+        programName: _selectedProgram!.name,
+        level: _selectedLevel!,
+        academicYear: _academicYearFor(_selectedDate),
+        session: _academicSession[0].toUpperCase() + _academicSession.substring(1),
+        termLabel: _termLabelForSession(_academicSession),
+        term: _selectedTerm!,
+        generatedAt: DateTime.now(),
+        recipientLabel: _recipientLabel,
+        courses: _selectedCourses,
+      );
+
+  Future<void> _showPdfActions(Uint8List bytes) async {
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.picture_as_pdf_rounded, size: 42, color: RegentColors.violet),
+              const SizedBox(height: 10),
+              const Text('Registration form ready', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              const Text('Keep a copy for your records or print it for the faculty office.', textAlign: TextAlign.center),
+              const SizedBox(height: 18),
+              Row(children: [
+                Expanded(child: OutlinedButton.icon(
+                  onPressed: () => _pdfService.print(bytes),
+                  icon: const Icon(Icons.print_outlined),
+                  label: const Text('Print'),
+                )),
+                const SizedBox(width: 12),
+                Expanded(child: FilledButton.icon(
+                  onPressed: () => _pdfService.download(bytes, 'course-registration-${_studentIdController.text.trim()}.pdf'),
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('Download'),
+                )),
+              ]),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

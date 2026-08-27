@@ -1,3 +1,7 @@
+import 'course_curriculum.dart';
+
+export 'course_curriculum.dart' show CourseData;
+
 class ProgramData {
   final String name;
   final List<CourseData> courses;
@@ -7,20 +11,6 @@ class ProgramData {
     required this.name,
     required this.courses,
     this.options,
-  });
-}
-
-class CourseData {
-  final String code;
-  final String name;
-  final int level; // 100, 200, 300, 400
-  final int semester; // 1 or 2
-
-  const CourseData({
-    required this.code,
-    required this.name,
-    required this.level,
-    required this.semester,
   });
 }
 
@@ -46,15 +36,23 @@ final List<FacultyData> universityFaculties = [
     programs: [
       ProgramData(
         name: 'BSc. Information Technology',
-        courses: [],
+        courses: coursesForProgram('BSc. Information Technology'),
       ),
       ProgramData(
         name: 'BSc. Computer Science',
-        courses: [],
+        courses: coursesForProgram('BSc. Computer Science'),
       ),
       ProgramData(
         name: 'BEng. Computer Engineering',
-        courses: [],
+        courses: coursesForProgram('BEng. Computer Engineering'),
+      ),
+      ProgramData(
+        name: 'BEng. Instrumentation Engineering',
+        courses: coursesForProgram('BEng. Instrumentation Engineering'),
+      ),
+      ProgramData(
+        name: 'BEng. Telecommunication Engineering',
+        courses: coursesForProgram('BEng. Telecommunication Engineering'),
       ),
       ProgramData(
         name: 'BEng. Applied Electronics and Systems Engineering',
@@ -74,7 +72,7 @@ final List<FacultyData> universityFaculties = [
     programs: [
       ProgramData(
         name: 'BSc. Accounting with Information Systems',
-        courses: [],
+        courses: coursesForProgram('BSc. Accounting with Information Systems'),
       ),
       ProgramData(
         name: 'BSc. Banking and Finance',
@@ -82,7 +80,7 @@ final List<FacultyData> universityFaculties = [
       ),
       ProgramData(
         name: 'Bachelor of Business Administration (E-Commerce)',
-        courses: [],
+        courses: coursesForProgram('Bachelor of Business Administration (E-Commerce)'),
       ),
       ProgramData(
         name: 'BSc. Economics with Computing',
@@ -94,7 +92,7 @@ final List<FacultyData> universityFaculties = [
           'Marketing Management',
           'Human Resource Management',
         ],
-        courses: [],
+        courses: coursesForProgram('BSc. Management with Computing'),
       ),
       ProgramData(
         name: 'BSc. Marketing',

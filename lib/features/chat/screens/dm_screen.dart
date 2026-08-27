@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:record/record.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/official_accounts.dart';
 import '../../../core/current_location.dart';
@@ -78,11 +79,13 @@ class _DMScreenState extends State<DMScreen> {
 
   String? _highlightedMessageId;
   final Map<String, GlobalKey> _messageKeys = {};
+  String _wallpaperId = 'midnight';
 
   @override
   void initState() {
     super.initState();
     _initializeChat();
+    _loadWallpaper();
 
     // Add listener for text changes to detect typing
     _messageController.addListener(_onTextChanged);
@@ -118,6 +121,114 @@ class _DMScreenState extends State<DMScreen> {
         });
       }
     }
+  }
+
+  String get _wallpaperKey =>
+      'regent_chat_wallpaper_${_chatService.currentMessagingId}_${widget.recipientId}';
+
+  static const _wallpaperOptions = <String, Color>{
+    'midnight': RegentColors.dmBackground,
+    'violet': Color(0xFF24143D),
+    'ocean': Color(0xFF0B2636),
+    'forest': Color(0xFF102C27),
+    'charcoal': Color(0xFF202124),
+  };
+
+  Color get _wallpaperColor => _wallpaperOptions[_wallpaperId]!;
+
+  Future<void> _loadWallpaper() async {
+    final preferences = await SharedPreferences.getInstance();
+    final wallpaper = preferences.getString(_wallpaperKey) ??
+        preferences.getString('regent_chat_wallpaper_all') ??
+        'midnight';
+    if (mounted && _wallpaperOptions.containsKey(wallpaper)) {
+      setState(() => _wallpaperId = wallpaper);
+    }
+  }
+
+  Future<void> _showWallpaperPicker() async {
+    final applyToAll = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: RegentColors.dmSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Chat wallpaper',
+                  style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              const Text('Choose a private wallpaper for this chat or your default for all chats.',
+                  style: TextStyle(color: Colors.white70)),
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: _wallpaperOptions.entries.map((entry) => InkWell(
+                  onTap: () => Navigator.pop(sheetContext, false),
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: entry.value,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: entry.key == _wallpaperId
+                            ? RegentColors.lightViolet
+                            : Colors.white24,
+                        width: 2,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(entry.key[0].toUpperCase(),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                )).toList(),
+              ),
+              const SizedBox(height: 18),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.pop(sheetContext, true),
+                icon: const Icon(Icons.wallpaper_rounded),
+                label: const Text('Apply selected colour to all chats'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (applyToAll == null) return;
+    if (!mounted) return;
+
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Choose wallpaper colour'),
+        children: _wallpaperOptions.keys
+            .map((id) => SimpleDialogOption(
+                  onPressed: () => Navigator.pop(dialogContext, id),
+                  child: Row(children: [
+                    CircleAvatar(backgroundColor: _wallpaperOptions[id]),
+                    const SizedBox(width: 12),
+                    Text(id[0].toUpperCase() + id.substring(1)),
+                  ]),
+                ))
+            .toList(),
+      ),
+    );
+    if (selected == null) return;
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(
+      applyToAll ? 'regent_chat_wallpaper_all' : _wallpaperKey,
+      selected,
+    );
+    if (!mounted) return;
+    setState(() => _wallpaperId = selected);
   }
 
   void _listenForNewMessages() {
@@ -883,6 +994,17 @@ class _DMScreenState extends State<DMScreen> {
             shrinkWrap: true,
             crossAxisCount: 6,
             children: [
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _createSticker();
+                },
+                child: const Center(
+                  child: Icon(Icons.add_circle_outline,
+                      color: RegentColors.lightViolet, size: 32),
+                ),
+              ),
               for (final sticker in stickers)
                 InkWell(
                   borderRadius: BorderRadius.circular(12),
@@ -902,6 +1024,38 @@ class _DMScreenState extends State<DMScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _createSticker() async {
+    final controller = TextEditingController();
+    final sticker = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Create a sticker'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 24,
+          decoration: const InputDecoration(
+            hintText: 'Emoji or short text',
+            prefixIcon: Icon(Icons.emoji_emotions_outlined),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('Send sticker'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (sticker == null || sticker.trim().isEmpty) return;
+    await _sendRichMessage(type: 'sticker', message: sticker.trim());
   }
 
   String _formatDuration(int seconds) {
@@ -1125,9 +1279,16 @@ class _DMScreenState extends State<DMScreen> {
             onSelected: (value) {
               if (value == 'clear') {
                 _showClearChatDialog();
+              } else if (value == 'wallpaper') {
+                _showWallpaperPicker();
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'wallpaper',
+                child: Text('Chat wallpaper',
+                    style: TextStyle(color: Colors.white)),
+              ),
               const PopupMenuItem(
                 value: 'clear',
                 child:
@@ -1137,7 +1298,19 @@ class _DMScreenState extends State<DMScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: Container(
+        decoration: BoxDecoration(
+          color: _wallpaperColor,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              _wallpaperColor,
+              Color.alphaBlend(RegentColors.violet.withOpacity(0.10), _wallpaperColor),
+            ],
+          ),
+        ),
+        child: Column(
         children: [
           Expanded(
             child: !_isChatReady
@@ -1327,6 +1500,7 @@ class _DMScreenState extends State<DMScreen> {
           ),
           _buildInputArea(),
         ],
+        ),
       ),
     );
   }
@@ -1528,6 +1702,17 @@ class _DMScreenState extends State<DMScreen> {
                         style: TextStyle(
                             color: Colors.white.withOpacity(0.6), fontSize: 11),
                       ),
+                      if (data['editedAt'] != null) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          'Edited',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.55),
+                            fontSize: 10,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
                       if (isMe) ...[
                         const SizedBox(width: 4),
                         Icon(
@@ -2203,6 +2388,11 @@ class _DMScreenState extends State<DMScreen> {
               Navigator.pop(context);
               _copyMessage(data['message'] ?? '');
             }),
+            if (_canEditMessage(data, isMe))
+              _buildOptionTile(Icons.edit_outlined, 'Edit message', () {
+                Navigator.pop(context);
+                _showEditMessageDialog(messageId, data['message']?.toString() ?? '');
+              }),
             _buildOptionTile(
               data['starredBy']?.contains(_chatService.currentMessagingId) ==
                       true
@@ -2231,6 +2421,62 @@ class _DMScreenState extends State<DMScreen> {
         ),
       ),
     );
+  }
+
+  bool _canEditMessage(Map<String, dynamic> data, bool isMe) {
+    final timestamp = data['timestamp'];
+    return isMe &&
+        data['type'] == 'text' &&
+        data['isDeleted'] != true &&
+        timestamp is Timestamp &&
+        DateTime.now().difference(timestamp.toDate()) <=
+            const Duration(minutes: 10);
+  }
+
+  Future<void> _showEditMessageDialog(
+    String messageId,
+    String originalMessage,
+  ) async {
+    final controller = TextEditingController(text: originalMessage);
+    final updated = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit message'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          minLines: 1,
+          maxLines: 5,
+          maxLength: 10000,
+          decoration: const InputDecoration(hintText: 'Update your message'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (updated == null || updated.trim() == originalMessage.trim()) return;
+    try {
+      await _chatService.editTextMessage(
+        otherUserId: widget.recipientId,
+        messageId: messageId,
+        message: updated,
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Message could not be edited: $error')),
+        );
+      }
+    }
   }
 
   Widget _buildReactionButton(String emoji, String messageId) {

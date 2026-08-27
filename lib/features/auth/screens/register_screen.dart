@@ -529,11 +529,47 @@ class _RegisterScreenState extends State<RegisterScreen>
       ),
       child: DropdownButtonFormField<T>(
         value: value,
-        items: items,
+        items: items
+            .map(
+              (item) => DropdownMenuItem<T>(
+                value: item.value,
+                enabled: item.enabled,
+                child: DefaultTextStyle.merge(
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  child: item.child,
+                ),
+              ),
+            )
+            .toList(),
         onChanged: onChanged,
         isExpanded: true,
+        selectedItemBuilder: (context) => items
+            .map(
+              (item) => Align(
+                alignment: Alignment.centerLeft,
+                child: DefaultTextStyle.merge(
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  child: item.child,
+                ),
+              ),
+            )
+            .toList(),
         dropdownColor: RegentColors.dmSurface,
-        style: const TextStyle(color: Colors.white),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+        ),
         decoration: InputDecoration(
           labelText: label,
           labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
@@ -543,6 +579,7 @@ class _RegisterScreenState extends State<RegisterScreen>
               const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
         icon: const Icon(Icons.arrow_drop_down, color: RegentColors.violet),
+        menuMaxHeight: 340,
       ),
     );
   }

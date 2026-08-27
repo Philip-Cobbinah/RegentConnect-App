@@ -6,6 +6,8 @@ class OfficialAccountDefinition {
   final String description;
   final String responseHours;
   final List<String> searchKeywords;
+  final String? faculty;
+  final bool isDepartmentHead;
 
   const OfficialAccountDefinition({
     required this.id,
@@ -15,6 +17,8 @@ class OfficialAccountDefinition {
     required this.description,
     required this.responseHours,
     this.searchKeywords = const [],
+    this.faculty,
+    this.isDepartmentHead = false,
   });
 
   String get shortId => id.replaceFirst('official:', '');
@@ -31,6 +35,8 @@ class OfficialAccountDefinition {
       'email': email,
       'description': description,
       'responseHours': responseHours,
+      'faculty': faculty,
+      'isDepartmentHead': isDepartmentHead,
       'isVerified': true,
       'active': active,
       'linkedAuthUid': linkedAuthUid,
@@ -54,10 +60,12 @@ class OfficialAccountDefinition {
       'fullName': name,
       'program': office,
       'department': office,
+      'faculty': faculty,
       'about': description,
       'role': 'official',
       'isOfficial': true,
       'officialAccountId': id,
+      'isDepartmentHead': isDepartmentHead,
       'accountActive': linkedUser != null,
       'responseHours': responseHours,
       'session': linkedUser?['session'],
@@ -68,7 +76,7 @@ class OfficialAccountDefinition {
 }
 
 class OfficialAccounts {
-  static const List<OfficialAccountDefinition> accounts = [
+  static const List<OfficialAccountDefinition> administrativeAccounts = [
     OfficialAccountDefinition(
       id: 'official:admissions',
       name: 'admissions@regent.edu.gh',
@@ -174,6 +182,95 @@ class OfficialAccounts {
       ],
     ),
   ];
+
+  static final List<OfficialAccountDefinition> facultyHeads = [
+    _facultyHead(
+      id: 'official:hod-computing-it',
+      name: 'Faculty HoD – Computing & IT Programmes',
+      office: 'Computing & Information Technology Programmes',
+      email: 'hod.computing-it@regent.edu.gh',
+      faculty: 'School of Engineering, Computing and Allied Sciences',
+      programmes: const [
+        'Information Technology',
+        'Computer Science',
+        'Information Systems Sciences',
+      ],
+    ),
+    _facultyHead(
+      id: 'official:hod-engineering',
+      name: 'Faculty HoD – Engineering Programmes',
+      office: 'Engineering Programmes',
+      email: 'hod.engineering@regent.edu.gh',
+      faculty: 'School of Engineering, Computing and Allied Sciences',
+      programmes: const [
+        'Computer Engineering',
+        'Instrumentation Engineering',
+        'Telecommunication Engineering',
+        'Applied Electronics and Systems Engineering',
+      ],
+    ),
+    _facultyHead(
+      id: 'official:hod-business',
+      name: 'Faculty HoD – Business Programmes',
+      office: 'Business, Leadership and Legal Studies Programmes',
+      email: 'hod.business@regent.edu.gh',
+      faculty: 'School of Business, Leadership and Legal Studies',
+      programmes: const ['Accounting', 'Banking and Finance', 'Business Administration', 'Economics', 'Management', 'Marketing', 'Human Resource Management', 'Procurement', 'Law'],
+    ),
+    _facultyHead(
+      id: 'official:hod-arts-sciences',
+      name: 'Faculty HoD – Arts & Sciences Programmes',
+      office: 'Arts and Sciences Programmes',
+      email: 'hod.arts-sciences@regent.edu.gh',
+      faculty: 'Faculty of Arts and Sciences',
+      programmes: const ['Psychology', 'Statistics', 'Sustainability', 'Social Sciences', 'Theology with Management'],
+    ),
+    _facultyHead(
+      id: 'official:hod-theology-ministry',
+      name: 'Faculty HoD – Theology & Ministry Programmes',
+      office: 'Theology and Ministry Programmes',
+      email: 'hod.theology-ministry@regent.edu.gh',
+      faculty: 'School of Theology and Ministry',
+      programmes: const ['Theology', 'Ministry', 'Pentecostal Studies', 'Graduate Theology'],
+    ),
+  ];
+
+  static final List<OfficialAccountDefinition> accounts = [
+    ...administrativeAccounts,
+    ...facultyHeads,
+  ];
+
+  static List<OfficialAccountDefinition> facultyHeadsForSchool(
+    String faculty,
+  ) =>
+      facultyHeads.where((account) => account.faculty == faculty).toList();
+
+  static OfficialAccountDefinition _facultyHead({
+    required String id,
+    required String name,
+    required String office,
+    required String email,
+    required String faculty,
+    required List<String> programmes,
+  }) =>
+      OfficialAccountDefinition(
+        id: id,
+        name: name,
+        office: office,
+        email: email,
+        description:
+            'Supports ${programmes.join(', ')}. Contact this faculty HoD for course enquiries, programme changes, academic advice and other programme-related student matters.',
+        responseHours: 'Monday-Friday, 8:00 AM-5:00 PM',
+        faculty: faculty,
+        isDepartmentHead: true,
+        searchKeywords: [
+          'hod',
+          'faculty hod',
+          'course enquiry',
+          'programme change',
+          ...programmes,
+        ],
+      );
 
   static OfficialAccountDefinition? byId(String? id) {
     if (id == null) return null;
