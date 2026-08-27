@@ -260,6 +260,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                             return 'Please enter your email';
                           if (!value.contains('@'))
                             return 'Please enter a valid email';
+                          if (!AuthService.isRegentEmail(value))
+                            return 'Use your @regent.edu.gh email';
                           return null;
                         },
                       ),

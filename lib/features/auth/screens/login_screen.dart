@@ -413,6 +413,9 @@ class _LoginScreenState extends State<LoginScreen>
                                 if (!value.contains('@')) {
                                   return 'Please enter a valid email';
                                 }
+                                if (!AuthService.isRegentEmail(value)) {
+                                  return 'Use your @regent.edu.gh email';
+                                }
                                 return null;
                               },
                             );

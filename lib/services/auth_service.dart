@@ -12,6 +12,11 @@ class AuthService {
   Stream<User?> get authStateChanges => _auth.authStateChanges();
   Stream<User?> get idTokenChanges => _auth.idTokenChanges();
 
+  static bool isRegentEmail(String email) {
+    return RegExp(r'^[^@\s]+@regent\.edu\.gh$', caseSensitive: false)
+        .hasMatch(email.trim());
+  }
+
   Future<void> syncCurrentUserBackend() async {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -83,6 +88,11 @@ class AuthService {
   }) async {
     try {
       final normalizedEmail = email.trim().toLowerCase();
+      if (!isRegentEmail(normalizedEmail)) {
+        throw Exception(
+          'Use your Regent University email address ending in @regent.edu.gh.',
+        );
+      }
       if (OfficialAccounts.byEmail(normalizedEmail) != null) {
         throw Exception(
           'Official office accounts are activated by the Regent Connect administrator. Use Officer access on the sign-in page.',
@@ -153,6 +163,11 @@ class AuthService {
   }) async {
     try {
       final normalizedEmail = email.trim().toLowerCase();
+      if (!isRegentEmail(normalizedEmail)) {
+        throw Exception(
+          'Only registered Regent University accounts ending in @regent.edu.gh can sign in.',
+        );
+      }
       final officialAccount = OfficialAccounts.byEmail(normalizedEmail);
 
       UserCredential credential;
@@ -207,6 +222,13 @@ class AuthService {
 
       return credential.user;
     } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found' ||
+          e.code == 'invalid-credential' ||
+          e.code == 'invalid-login-credentials') {
+        throw Exception(
+          'No account exists for this email. Create an account first, then sign in.',
+        );
+      }
       throw Exception(e.message);
     } catch (e) {
       throw Exception('An error occurred: $e');
@@ -232,7 +254,13 @@ class AuthService {
 
   // Reset password
   Future<void> resetPassword(String email) async {
-    await _auth.sendPasswordResetEmail(email: email.trim().toLowerCase());
+    final normalizedEmail = email.trim().toLowerCase();
+    if (!isRegentEmail(normalizedEmail)) {
+      throw Exception(
+        'Password reset is available only for @regent.edu.gh accounts.',
+      );
+    }
+    await _auth.sendPasswordResetEmail(email: normalizedEmail);
   }
 
   Future<void> resendVerificationEmail() async {
