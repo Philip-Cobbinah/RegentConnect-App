@@ -576,6 +576,8 @@ class _RegisterScreenState extends State<RegisterScreen>
           labelText: label,
           labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
           prefixIcon: Icon(icon, color: RegentColors.violet),
+          filled: true,
+          fillColor: RegentColors.dmSurface.withOpacity(0.8),
           border: InputBorder.none,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
