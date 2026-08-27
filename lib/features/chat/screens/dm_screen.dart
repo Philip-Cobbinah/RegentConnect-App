@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -80,6 +81,7 @@ class _DMScreenState extends State<DMScreen> {
   String? _highlightedMessageId;
   final Map<String, GlobalKey> _messageKeys = {};
   String _wallpaperId = 'midnight';
+  Uint8List? _wallpaperImage;
 
   @override
   void initState() {
@@ -136,8 +138,23 @@ class _DMScreenState extends State<DMScreen> {
 
   Color get _wallpaperColor => _wallpaperOptions[_wallpaperId]!;
 
+  String get _wallpaperImageKey => '${_wallpaperKey}_image';
+
+  String get _wallpaperImageAllKey => 'regent_chat_wallpaper_all_image';
+
   Future<void> _loadWallpaper() async {
     final preferences = await SharedPreferences.getInstance();
+    final encodedImage = preferences.getString(_wallpaperImageKey) ??
+        preferences.getString(_wallpaperImageAllKey);
+    if (encodedImage != null && encodedImage.isNotEmpty) {
+      try {
+        final image = base64Decode(encodedImage);
+        if (mounted) setState(() => _wallpaperImage = image);
+      } catch (_) {
+        await preferences.remove(_wallpaperImageKey);
+      }
+      return;
+    }
     final wallpaper = preferences.getString(_wallpaperKey) ??
         preferences.getString('regent_chat_wallpaper_all') ??
         'midnight';
@@ -147,7 +164,7 @@ class _DMScreenState extends State<DMScreen> {
   }
 
   Future<void> _showWallpaperPicker() async {
-    final applyToAll = await showModalBottomSheet<bool>(
+    final target = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: RegentColors.dmSurface,
       shape: const RoundedRectangleBorder(
@@ -170,7 +187,7 @@ class _DMScreenState extends State<DMScreen> {
                 spacing: 12,
                 runSpacing: 12,
                 children: _wallpaperOptions.entries.map((entry) => InkWell(
-                  onTap: () => Navigator.pop(sheetContext, false),
+                  onTap: () => Navigator.pop(sheetContext, 'chat-colour'),
                   child: Container(
                     width: 64,
                     height: 64,
@@ -193,17 +210,66 @@ class _DMScreenState extends State<DMScreen> {
               ),
               const SizedBox(height: 18),
               OutlinedButton.icon(
-                onPressed: () => Navigator.pop(sheetContext, true),
+                onPressed: () => Navigator.pop(sheetContext, 'all-colour'),
                 icon: const Icon(Icons.wallpaper_rounded),
                 label: const Text('Apply selected colour to all chats'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.pop(sheetContext, 'chat-image'),
+                icon: const Icon(Icons.photo_library_outlined),
+                label: const Text('Use image for this chat'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.pop(sheetContext, 'all-image'),
+                icon: const Icon(Icons.collections_outlined),
+                label: const Text('Use image for all chats'),
               ),
             ],
           ),
         ),
       ),
     );
-    if (applyToAll == null) return;
+    if (target == null) return;
     if (!mounted) return;
+
+    final applyToAll = target.startsWith('all-');
+    if (target.endsWith('image')) {
+      final source = await showDialog<ImageSource>(
+        context: context,
+        builder: (dialogContext) => SimpleDialog(
+          title: const Text('Choose wallpaper image'),
+          children: [
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(dialogContext, ImageSource.gallery),
+              child: const Text('Choose from gallery'),
+            ),
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(dialogContext, ImageSource.camera),
+              child: const Text('Take a picture'),
+            ),
+          ],
+        ),
+      );
+      if (source == null) return;
+      final image = await ImagePicker().pickImage(source: source, imageQuality: 80);
+      if (image == null) return;
+      final bytes = await image.readAsBytes();
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(
+        applyToAll ? _wallpaperImageAllKey : _wallpaperImageKey,
+        base64Encode(bytes),
+      );
+      await preferences.remove(
+        applyToAll ? 'regent_chat_wallpaper_all' : _wallpaperKey,
+      );
+      if (!mounted) return;
+      setState(() {
+        _wallpaperImage = bytes;
+        _wallpaperId = 'midnight';
+      });
+      return;
+    }
 
     final selected = await showDialog<String>(
       context: context,
@@ -227,8 +293,14 @@ class _DMScreenState extends State<DMScreen> {
       applyToAll ? 'regent_chat_wallpaper_all' : _wallpaperKey,
       selected,
     );
+    await preferences.remove(
+      applyToAll ? _wallpaperImageAllKey : _wallpaperImageKey,
+    );
     if (!mounted) return;
-    setState(() => _wallpaperId = selected);
+    setState(() {
+      _wallpaperId = selected;
+      _wallpaperImage = null;
+    });
   }
 
   void _listenForNewMessages() {
@@ -1027,6 +1099,54 @@ class _DMScreenState extends State<DMScreen> {
   }
 
   Future<void> _createSticker() async {
+    final source = await showDialog<ImageSource?>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Create a sticker'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(dialogContext, ImageSource.gallery),
+            child: const Text('Create from gallery image'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(dialogContext, ImageSource.camera),
+            child: const Text('Take a picture'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(dialogContext, null),
+            child: const Text('Create text sticker'),
+          ),
+        ],
+      ),
+    );
+    if (source != null) {
+      final image = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 75,
+      );
+      if (image == null) return;
+      setState(() => _isSending = true);
+      try {
+        await _chatService.sendMediaMessage(
+          receiverId: widget.recipientId,
+          bytes: await image.readAsBytes(),
+          type: 'sticker',
+          originalName: image.name,
+          contentType: image.mimeType,
+          message: 'Photo sticker',
+        );
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Sticker could not be sent: $error')),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isSending = false);
+      }
+      return;
+    }
+
     final controller = TextEditingController();
     final sticker = await showDialog<String>(
       context: context,
@@ -1301,6 +1421,13 @@ class _DMScreenState extends State<DMScreen> {
       body: Container(
         decoration: BoxDecoration(
           color: _wallpaperColor,
+          image: _wallpaperImage == null
+              ? null
+              : DecorationImage(
+                  image: MemoryImage(_wallpaperImage!),
+                  fit: BoxFit.cover,
+                  opacity: 0.38,
+                ),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -1782,6 +1909,7 @@ class _DMScreenState extends State<DMScreen> {
     bool isMe,
   ) {
     final message = (data['message'] ?? '').toString();
+    final mediaUrl = data['mediaUrl']?.toString();
     final metadata = Map<String, dynamic>.from(data['metadata'] ?? const {});
 
     if (metadata['isStatusReply'] == true) {
@@ -1925,6 +2053,22 @@ class _DMScreenState extends State<DMScreen> {
     }
 
     if (type == 'sticker') {
+      if (mediaUrl != null && mediaUrl.isNotEmpty) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Image.network(
+            mediaUrl,
+            width: 150,
+            height: 150,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const Icon(
+              Icons.broken_image_outlined,
+              color: Colors.white70,
+              size: 48,
+            ),
+          ),
+        );
+      }
       return Text(message, style: const TextStyle(fontSize: 52));
     }
 

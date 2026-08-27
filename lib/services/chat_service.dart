@@ -69,38 +69,18 @@ class ChatService {
             ?.toString();
     final chatReference =
         _firestore.collection(AppConstants.chatsCollection).doc(getChatRoomId(otherUserId));
-    final existingChat = await chatReference.get();
-    final existingParticipantAuthIds = existingChat.exists
-        ? List<String>.from(
-            existingChat.data()?['participantAuthIds'] ?? const [],
-          )
-        : const <String>[];
     final participantAuthIds = <String>{
-      ...existingParticipantAuthIds,
       currentUserId,
       if (recipientAuthId != null && recipientAuthId.isNotEmpty)
         recipientAuthId,
     }.toList()
       ..sort();
     final requestedParticipants = [currentMessagingId, otherUserId]..sort();
-    final existingParticipants = existingChat.exists
-        ? List<String>.from(existingChat.data()?['participants'] ?? const [])
-        : null;
-    if (existingParticipants != null &&
-        (existingParticipants.length != 2 ||
-            !existingParticipants.toSet().containsAll(requestedParticipants))) {
-      throw Exception('This conversation has invalid participants.');
-    }
     await chatReference.set({
-      'participants': existingParticipants ?? requestedParticipants,
+      'participants': requestedParticipants,
       'participantAuthIds': participantAuthIds,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
-
-    final chat = await chatReference.get();
-    if (!chat.exists) {
-      throw Exception('The conversation could not be created. Please try again.');
-    }
   }
 
   // Send a text message - updated with reply support

@@ -208,7 +208,7 @@ service cloud.firestore {
         allow update: if participatesIn(chatData(chatId)) &&
           (
             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-              'isRead', 'reactions', 'starredBy', 'metadata'
+              'isRead', 'viewedBy', 'reactions', 'starredBy', 'metadata'
             ]) ||
             (
               resource.data.senderAuthId == request.auth.uid &&
