@@ -41,6 +41,99 @@ class DMScreen extends StatefulWidget {
   State<DMScreen> createState() => _DMScreenState();
 }
 
+class _SwipeReplyMessage extends StatefulWidget {
+  const _SwipeReplyMessage({
+    required this.isOutgoing,
+    required this.onReply,
+    required this.child,
+  });
+
+  final bool isOutgoing;
+  final VoidCallback onReply;
+  final Widget child;
+
+  @override
+  State<_SwipeReplyMessage> createState() => _SwipeReplyMessageState();
+}
+
+class _SwipeReplyMessageState extends State<_SwipeReplyMessage>
+    with SingleTickerProviderStateMixin {
+  double _offset = 0;
+  late final AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    )..addListener(() {
+        if (mounted) setState(() => _offset = _animation.value);
+      });
+  }
+
+  void _animateBack() {
+    _animation = Tween<double>(begin: _offset, end: 0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
+    _controller
+      ..reset()
+      ..forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final replyProgress = (_offset.abs() / 72).clamp(0.0, 1.0);
+    return GestureDetector(
+      onHorizontalDragUpdate: (details) {
+        final delta = details.primaryDelta ?? 0;
+        final allowed = widget.isOutgoing ? delta < 0 : delta > 0;
+        if (allowed || _offset != 0) {
+          setState(() {
+            _offset = (_offset + delta).clamp(-96.0, 96.0);
+          });
+        }
+      },
+      onHorizontalDragEnd: (_) {
+        if (_offset.abs() >= 72) widget.onReply();
+        _animateBack();
+      },
+      child: Stack(
+        alignment: widget.isOutgoing
+            ? Alignment.centerRight
+            : Alignment.centerLeft,
+        children: [
+          Opacity(
+            opacity: replyProgress,
+            child: Padding(
+              padding: EdgeInsets.only(
+                right: widget.isOutgoing ? 12 : 0,
+                left: widget.isOutgoing ? 0 : 12,
+              ),
+              child: Icon(
+                Icons.reply_rounded,
+                color: RegentColors.lightViolet,
+                size: 22 + (replyProgress * 4),
+              ),
+            ),
+          ),
+          Transform.translate(
+            offset: Offset(_offset, 0),
+            child: widget.child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DMScreenState extends State<DMScreen> {
   final _messageController = TextEditingController();
   final _chatService = ChatService();
@@ -1720,8 +1813,8 @@ class _DMScreenState extends State<DMScreen> {
     final deletedBy = data['deletedBy'];
 
     // Check if message was deleted for me only
-    final deletedForMe = data['deletedForMe'] == true &&
-        deletedBy == _chatService.currentMessagingId;
+    final deletedForMe = List<String>.from(data['deletedFor'] ?? const [])
+        .contains(_chatService.currentMessagingId);
 
     // If deleted for me only, don't show to me
     if (deletedForMe && !deletedForEveryone) {
@@ -1745,14 +1838,12 @@ class _DMScreenState extends State<DMScreen> {
         pinnedUntil.toDate().isAfter(DateTime.now());
     final replyTo = data['replyTo'] as Map<String, dynamic>?;
 
-    return GestureDetector(
-      onLongPress: () => _showMessageOptions(context, data, isMe, messageId),
-      onHorizontalDragEnd: (details) {
-        final velocity = details.primaryVelocity ?? 0;
-        final shouldReply = isMe ? velocity < -250 : velocity > 250;
-        if (shouldReply) _setReplyTo(data, messageId: messageId);
-      },
-      child: Align(
+    return _SwipeReplyMessage(
+      isOutgoing: isMe,
+      onReply: () => _setReplyTo(data, messageId: messageId),
+      child: GestureDetector(
+        onLongPress: () => _showMessageOptions(context, data, isMe, messageId),
+        child: Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Column(
           crossAxisAlignment:
@@ -2626,6 +2717,7 @@ class _DMScreenState extends State<DMScreen> {
             child: const Text('Save'),
           ),
         ],
+        ),
       ),
     );
     controller.dispose();

@@ -52,17 +52,20 @@ class ChatService {
       throw Exception('Choose another user to start a conversation.');
     }
     final otherUser = await getUserData(otherUserId);
-    if (otherUser == null) {
-      throw Exception('This user is no longer available for messaging.');
-    }
+    final recipientData = otherUser ?? <String, dynamic>{
+      'uid': otherUserId,
+      'authUid': otherUserId,
+      'chatIdentity': otherUserId,
+      'fullName': 'Regent user',
+    };
     final recipientIdentity =
-        (otherUser['chatIdentity'] ?? otherUser['uid'] ?? otherUserId)
+        (recipientData['chatIdentity'] ?? recipientData['uid'] ?? otherUserId)
             .toString();
     if (recipientIdentity != otherUserId) {
       throw Exception('The selected user has an invalid chat identity.');
     }
     final recipientAuthId =
-        (otherUser['authUid'] ??
+        (recipientData['authUid'] ??
                 (OfficialAccounts.isOfficialIdentity(otherUserId)
                     ? null
                     : otherUserId))
@@ -284,10 +287,6 @@ class ChatService {
         .collection('messages')
         .doc(messageId)
         .update({
-      'isDeleted': true,
-      'deletedBy': currentMessagingId,
-      'deletedByName': userName,
-      'deletedAt': FieldValue.serverTimestamp(),
       'deletedFor': FieldValue.arrayUnion([currentMessagingId]),
     });
   }
