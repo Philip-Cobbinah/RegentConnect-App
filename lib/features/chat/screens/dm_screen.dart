@@ -1354,8 +1354,7 @@ class _DMScreenState extends State<DMScreen> {
     final today = DateTime(now.year, now.month, now.day);
     final messageDate = DateTime(date.year, date.month, date.day);
 
-    final time =
-        '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    final time = DateFormat('h:mm a').format(date);
     final day = date.day.toString().padLeft(2, '0');
     final month = date.month.toString().padLeft(2, '0');
     final year = date.year.toString().padLeft(4, '0');
@@ -2159,6 +2158,18 @@ class _DMScreenState extends State<DMScreen> {
                     _formatDuration(data['audioDuration'] as int? ?? 0),
                     style: const TextStyle(color: Colors.white60, fontSize: 12),
                   ),
+                ],
+              ),
+              PopupMenuButton<double>(
+                tooltip: 'Playback speed',
+                icon: const Icon(Icons.speed, color: Colors.white70, size: 20),
+                onSelected: (speed) => _audioPlayer.setPlaybackRate(speed),
+                itemBuilder: (context) => [
+                  for (final speed in [0.75, 1.0, 1.25, 1.5, 2.0])
+                    PopupMenuItem<double>(
+                      value: speed,
+                      child: Text('${speed}x'),
+                    ),
                 ],
               ),
             ],

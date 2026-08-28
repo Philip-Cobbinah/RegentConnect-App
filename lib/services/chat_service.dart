@@ -454,9 +454,12 @@ class ChatService {
 
   // Get all chat rooms for current user
   Stream<QuerySnapshot> getChatRooms() {
+    if (currentUserId.isEmpty) {
+      return const Stream<QuerySnapshot>.empty();
+    }
     return _firestore
         .collection(AppConstants.chatsCollection)
-        .where('participants', arrayContains: currentMessagingId)
+        .where('participantAuthIds', arrayContains: currentUserId)
         .snapshots();
   }
 
@@ -538,8 +541,8 @@ class ChatService {
         contentType: resolvedContentType,
         size: bytes.length,
       );
-    } catch (error) {
-      debugPrint('Chat media upload failed: $error');
+    } catch (error, stackTrace) {
+      debugPrint('Chat media upload failed: $error\n$stackTrace');
       return null;
     }
   }
