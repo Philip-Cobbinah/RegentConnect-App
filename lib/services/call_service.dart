@@ -111,6 +111,7 @@ class CallService {
       'endedAt': null,
       'endedBy': null,
       'duration': 0,
+      'callReadBy': [currentUserId],
     };
 
     final batch = _firestore.batch();
@@ -171,6 +172,39 @@ class CallService {
         .collection('calls')
         .where('participantIds', arrayContains: currentUserId)
         .snapshots();
+  }
+
+  Stream<int> getUnreadCallCount() {
+    return watchCallHistory().map((snapshot) => snapshot.docs.where((doc) {
+          final data = doc.data();
+          final status = data['status']?.toString();
+          final isIncoming = data['receiverId'] == currentUserId;
+          final isUnread = !(List<String>.from(data['callReadBy'] ?? const [])
+              .contains(currentUserId));
+          return isIncoming &&
+              isUnread &&
+              {'missed', 'declined', 'failed'}.contains(status);
+        }).length);
+  }
+
+  Future<void> markCallHistoryAsRead() async {
+    if (currentUserId.isEmpty) return;
+    final snapshot = await _firestore
+        .collection('calls')
+        .where('participantIds', arrayContains: currentUserId)
+        .get();
+    for (final document in snapshot.docs) {
+      final data = document.data();
+      final status = data['status']?.toString();
+      if (data['receiverId'] == currentUserId &&
+          {'missed', 'declined', 'failed'}.contains(status) &&
+          !(List<String>.from(data['callReadBy'] ?? const [])
+              .contains(currentUserId))) {
+        await document.reference.update({
+          'callReadBy': FieldValue.arrayUnion([currentUserId]),
+        });
+      }
+    }
   }
 
   Future<void> acceptCall(String callId) async {

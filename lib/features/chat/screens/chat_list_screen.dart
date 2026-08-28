@@ -187,7 +187,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: RegentColors.violet,
+                          color: RegentColors.green,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -923,7 +923,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: RegentColors.violet,
+                                    color: RegentColors.green,
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
@@ -1218,7 +1218,7 @@ class _ChatListTile extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: RegentColors.violet,
+                        color: RegentColors.green,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -1235,7 +1235,7 @@ class _ChatListTile extends StatelessWidget {
                       width: 8,
                       height: 8,
                       decoration: const BoxDecoration(
-                        color: RegentColors.violet,
+                        color: RegentColors.green,
                         shape: BoxShape.circle,
                       ),
                     ),

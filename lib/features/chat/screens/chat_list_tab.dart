@@ -355,7 +355,7 @@ class _ChatListTabState extends State<ChatListTab> {
               child: Icon(
                 Icons.admin_panel_settings,
                 size: 17,
-                color: RegentColors.violet,
+                          color: RegentColors.green,
               ),
             ),
         ],

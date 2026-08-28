@@ -226,6 +226,13 @@ class StatusService {
     );
   }
 
+  Stream<int> getUnreadStatusCount() {
+    return getActiveStatuses().map((statuses) => statuses.where((status) {
+          return status.postedBy != currentUserId &&
+              !status.viewedBy.contains(currentUserId);
+        }).length);
+  }
+
   // View a status (add current user to views)
   Future<void> viewStatus(String statusId) async {
     if (currentUserId.isEmpty) return;

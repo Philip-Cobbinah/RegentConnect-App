@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../services/call_service.dart';
+import '../../../services/chat_service.dart';
+import '../../../services/status_service.dart';
 import '../../../core/theme.dart';
 import '../../../core/theme_provider.dart';
 import '../../../widgets/wave_clipper.dart';
@@ -21,6 +24,10 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   int _selectedFilter = 0;
+
+  final _chatService = ChatService();
+  final _callService = CallService();
+  final _statusService = StatusService();
 
   final List<String> _filters = ['All', 'Unread', 'Favorites', 'Groups'];
 
@@ -273,6 +280,11 @@ class _MainScreenState extends State<MainScreen> {
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
 
+    Stream<int>? badgeStream;
+    if (index == 0) badgeStream = _chatService.getTotalUnreadCount();
+    if (index == 1) badgeStream = _callService.getUnreadCallCount();
+    if (index == 2) badgeStream = _statusService.getUnreadStatusCount();
+
     return GestureDetector(
       onTap: () => _navigateToTab(index),
       child: AnimatedContainer(
@@ -286,10 +298,48 @@ class _MainScreenState extends State<MainScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.white : Colors.white70,
-              size: isSelected ? 28 : 24,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  icon,
+                  color: isSelected ? Colors.white : Colors.white70,
+                  size: isSelected ? 28 : 24,
+                ),
+                if (badgeStream != null)
+                  StreamBuilder<int>(
+                    stream: badgeStream,
+                    builder: (context, snapshot) {
+                      final count = snapshot.data ?? 0;
+                      if (count == 0) return const SizedBox.shrink();
+                      return Positioned(
+                        right: -12,
+                        top: -9,
+                        child: Container(
+                          constraints: const BoxConstraints(minWidth: 18),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: RegentColors.green,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: color1ForBadge(context)),
+                          ),
+                          child: Text(
+                            count > 99 ? '99+' : '$count',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+              ],
             ),
             const SizedBox(height: 2),
             Text(
@@ -306,8 +356,17 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  Color color1ForBadge(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark
+        ? RegentColors.darkBackground
+        : RegentColors.primaryDark;
+  }
+
   void _navigateToTab(int index) {
     setState(() => _currentIndex = index);
+    if (index == 1) {
+      _callService.markCallHistoryAsRead();
+    }
   }
 
   void _showSearch() {
