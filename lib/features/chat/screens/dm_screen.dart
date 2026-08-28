@@ -12,6 +12,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:record/record.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/official_accounts.dart';
 import '../../../core/current_location.dart';
@@ -20,6 +21,7 @@ import '../../../services/chat_service.dart';
 import '../../../services/call_service.dart';
 import '../../../services/notification_service.dart';
 import '../../calls/screens/video_call_screen.dart';
+import '../../ai_bot/screens/regent_ai_screen.dart';
 import '../../../widgets/active_call_overlay.dart';
 import '../widgets/chat_media_viewer.dart';
 
@@ -2658,6 +2660,13 @@ class _DMScreenState extends State<DMScreen> {
               Navigator.pop(context);
               _copyMessage(data['message'] ?? '');
             }),
+            _buildOptionTile(Icons.check_box_outlined, 'Select', () {
+              Navigator.pop(context);
+              setState(() => _selectedMessageId = messageId);
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                const SnackBar(content: Text('Message selected')),
+              );
+            }),
             if (_canEditMessage(data, isMe))
               _buildOptionTile(Icons.edit_outlined, 'Edit message', () {
                 Navigator.pop(context);
@@ -2819,6 +2828,25 @@ class _DMScreenState extends State<DMScreen> {
           _buildOptionTile(Icons.push_pin, 'Pin message', () {
             Navigator.pop(context);
             _showPinDurationPicker(messageId);
+          }),
+          if ((data['mediaUrl'] ?? '').toString().isNotEmpty)
+            _buildOptionTile(Icons.download, 'Download', () {
+              Navigator.pop(context);
+              _downloadMedia(data['mediaUrl'].toString());
+            }),
+          _buildOptionTile(Icons.auto_awesome, 'Ask RegentAI', () {
+            Navigator.pop(context);
+            final text = (data['message'] ?? data['content'] ?? '').toString();
+            Navigator.push(
+              this.context,
+              MaterialPageRoute(
+                builder: (_) => RegentAIScreen(
+                  initialPrompt: text.isEmpty
+                      ? 'Help me understand this message.'
+                      : 'Help me understand and respond to this message:\n$text',
+                ),
+              ),
+            );
           }),
           _buildOptionTile(Icons.report, 'Report', () {
             Navigator.pop(context);
@@ -3543,6 +3571,18 @@ class _DMScreenState extends State<DMScreen> {
     if (_messageController.text.trim().isEmpty || _isSending) return;
     final confirmed = await _promptViewOnce('message');
     if (confirmed == true) await _sendMessageWithReply(isViewOnce: true);
+  }
+
+  Future<void> _downloadMedia(String url) async {
+    final launched = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('The attachment could not be opened')),
+      );
+    }
   }
 
   Future<void> _sendMessageWithReply({bool isViewOnce = false}) async {
