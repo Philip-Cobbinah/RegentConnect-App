@@ -1837,6 +1837,7 @@ class _DMScreenState extends State<DMScreen> {
     final pinnedUntil = data['pinnedUntil'];
     final isPinned = pinnedUntil is Timestamp &&
         pinnedUntil.toDate().isAfter(DateTime.now());
+    final isSelected = _selectedMessageId == messageId;
     final replyTo = data['replyTo'] as Map<String, dynamic>?;
 
     return _SwipeReplyMessage(
@@ -1898,6 +1899,9 @@ class _DMScreenState extends State<DMScreen> {
                   maxWidth: MediaQuery.of(context).size.width * 0.75),
               decoration: BoxDecoration(
                 color: isMe ? RegentColors.violet : RegentColors.dmCard,
+                border: isSelected
+                    ? Border.all(color: RegentColors.lightViolet, width: 2)
+                    : null,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),
