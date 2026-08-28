@@ -109,7 +109,9 @@ class ChatService {
     }
 
     final chatRoomId = getChatRoomId(receiverId);
-    final timestamp = FieldValue.serverTimestamp();
+    // Use a concrete timestamp so the web listener never has to reconcile a
+    // null pending server timestamp while ordering the message list.
+    final timestamp = Timestamp.now();
     await ensureChatRoom(receiverId);
 
     // Get sender info
