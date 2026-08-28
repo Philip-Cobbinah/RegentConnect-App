@@ -21,7 +21,7 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_REGENT_CONNECT_85439 }}
         run: |
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-service-account.json"
-          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-service-account.json" npx --yes firebase-tools@latest deploy --only firestore:rules --project regent-connect-85439
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-service-account.json" npx --yes firebase-tools@latest deploy --only firestore --project regent-connect-85439
           rm -f "$RUNNER_TEMP/firebase-service-account.json"
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
