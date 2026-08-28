@@ -423,8 +423,21 @@ class _CreateStatusScreenState extends State<CreateStatusScreen> {
     return switch (widget.type) {
       'text' => _buildTextStatus(),
       'image' => _buildImageStatus(),
+      'audio' => _buildAudioStatus(),
       _ => _buildVideoStatus(),
     };
+  }
+
+  Widget _buildAudioStatus() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const Center(
+          child: Icon(Icons.mic, color: Colors.white, size: 96),
+        ),
+        _captionField(bottom: 18),
+      ],
+    );
   }
 
   Widget _buildTextStatus() {

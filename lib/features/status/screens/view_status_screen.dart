@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 import '../../../core/theme.dart';
 import '../../../services/chat_service.dart';
@@ -23,6 +24,7 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
     with SingleTickerProviderStateMixin {
   final StatusService _statusService = StatusService();
   final ChatService _chatService = ChatService();
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   int _currentIndex = 0;
   late AnimationController _progressController;
@@ -148,6 +150,7 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
     final controller = _videoController;
     controller?.removeListener(_handleVideoProgress);
     controller?.dispose();
+    _audioPlayer.dispose();
     _progressController.dispose();
     super.dispose();
   }
@@ -465,6 +468,20 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
               ),
             ),
         ],
+      );
+    } else if (type == 'audio') {
+      return Center(
+        child: InkWell(
+          onTap: () => _audioPlayer.play(
+            UrlSource(status['mediaUrl']?.toString() ?? ''),
+          ),
+          borderRadius: BorderRadius.circular(48),
+          child: const CircleAvatar(
+            radius: 48,
+            backgroundColor: RegentColors.violet,
+            child: Icon(Icons.play_arrow, color: Colors.white, size: 54),
+          ),
+        ),
       );
     } else {
       final isMuted = status['isMuted'] == true;

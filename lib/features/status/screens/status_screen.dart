@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:record/record.dart';
 import '../../../core/theme.dart';
 import '../../../services/status_service.dart';
 import 'view_status_screen.dart';
@@ -15,6 +16,14 @@ class StatusScreen extends StatefulWidget {
 
 class _StatusScreenState extends State<StatusScreen> {
   final StatusService _statusService = StatusService();
+  final Record _audioRecorder = Record();
+  bool _isRecordingAudio = false;
+
+  @override
+  void dispose() {
+    _audioRecorder.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -369,6 +378,7 @@ class _StatusScreenState extends State<StatusScreen> {
                   Navigator.pop(context);
                   _recordVideo();
                 }),
+                _mediaOption(Icons.mic, 'Audio', _recordAudioStatus),
               ],
             ),
           ],
@@ -432,6 +442,65 @@ class _StatusScreenState extends State<StatusScreen> {
     if (video != null && mounted) {
       _createMediaStatus(video, 'video');
     }
+  }
+
+  Future<void> _recordAudioStatus() async {
+    Navigator.pop(context);
+    if (!await _audioRecorder.hasPermission()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone permission is required.')),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Record audio status'),
+          content: Text(_isRecordingAudio
+              ? 'Recording in progress…'
+              : 'Tap start, then stop when you are finished.'),
+          actions: [
+            TextButton(
+              onPressed: _isRecordingAudio
+                  ? null
+                  : () async {
+                      await _audioRecorder.start(encoder: AudioEncoder.aacLc);
+                      setState(() => _isRecordingAudio = true);
+                      setDialogState(() {});
+                    },
+              child: const Text('Start'),
+            ),
+            FilledButton(
+              onPressed: !_isRecordingAudio
+                  ? null
+                  : () async {
+                      final path = await _audioRecorder.stop();
+                      setState(() => _isRecordingAudio = false);
+                      if (dialogContext.mounted) Navigator.pop(dialogContext);
+                      if (path != null && mounted) {
+                        _createMediaStatus(
+                          XFile(path, name: 'status_audio.m4a'),
+                          'audio',
+                        );
+                      }
+                    },
+              child: const Text('Stop and continue'),
+            ),
+            TextButton(
+              onPressed: _isRecordingAudio
+                  ? null
+                  : () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String? _mediaTypeFor(XFile media) {
