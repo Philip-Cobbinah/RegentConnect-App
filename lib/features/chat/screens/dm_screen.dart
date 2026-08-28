@@ -1506,7 +1506,12 @@ class _DMScreenState extends State<DMScreen> {
                                 color: RegentColors.violet));
                       }
 
-                      final messages = snapshot.data!.docs;
+                      final messages = snapshot.data!.docs
+                          .where((doc) {
+                            final data = doc.data() as Map<String, dynamic>;
+                            return data['isDeleted'] != true;
+                          })
+                          .toList();
 
                       if (messages.isEmpty) {
                         return const Center(

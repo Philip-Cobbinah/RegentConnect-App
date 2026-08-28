@@ -375,7 +375,6 @@ class ChatService {
         .collection(AppConstants.chatsCollection)
         .doc(chatRoomId)
         .collection('messages')
-        .where('isDeleted', isEqualTo: false)
         .orderBy('timestamp', descending: false)
         .snapshots();
   }
@@ -420,11 +419,13 @@ class ChatService {
         .doc(chatRoomId)
         .collection('messages')
         .where('receiverId', isEqualTo: currentMessagingId)
-        .where('isRead', isEqualTo: false)
         .get();
 
     for (var doc in unreadMessages.docs) {
-      await doc.reference.update({'isRead': true});
+      final data = doc.data();
+      if (data['isRead'] != true) {
+        await doc.reference.update({'isRead': true});
+      }
     }
   }
 
@@ -1101,10 +1102,12 @@ class ChatService {
             .doc(room.id)
             .collection('messages')
             .where('receiverId', isEqualTo: currentMessagingId)
-            .where('isRead', isEqualTo: false)
             .get();
 
-        totalUnread += unreadQuery.docs.length;
+        totalUnread += unreadQuery.docs.where((doc) {
+          final data = doc.data();
+          return data['isRead'] != true;
+        }).length;
       }
 
       return totalUnread;
@@ -1119,8 +1122,10 @@ class ChatService {
         .doc(chatRoomId)
         .collection('messages')
         .where('receiverId', isEqualTo: currentMessagingId)
-        .where('isRead', isEqualTo: false)
         .snapshots()
-        .map((snapshot) => snapshot.docs.length);
+        .map((snapshot) => snapshot.docs.where((doc) {
+              final data = doc.data();
+              return data['isRead'] != true;
+            }).length);
   }
 }
