@@ -2718,7 +2718,6 @@ class _DMScreenState extends State<DMScreen> {
             child: const Text('Save'),
           ),
         ],
-        ),
       ),
     );
     controller.dispose();
