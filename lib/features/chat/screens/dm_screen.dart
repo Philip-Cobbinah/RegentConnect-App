@@ -129,6 +129,7 @@ class _SwipeReplyMessageState extends State<_SwipeReplyMessage>
             child: widget.child,
           ),
         ],
+        ),
       ),
     );
   }
@@ -2012,6 +2013,7 @@ class _DMScreenState extends State<DMScreen> {
               ),
           ],
         ),
+      ),
       ),
     );
   }
