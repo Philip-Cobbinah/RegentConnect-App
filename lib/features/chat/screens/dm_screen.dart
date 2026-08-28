@@ -1848,7 +1848,7 @@ class _DMScreenState extends State<DMScreen> {
                       ],
                       if (isMe) ...[
                         const SizedBox(width: 4),
-                        const Icon(
+                        Icon(
                           Icons.done_all,
                           size: 14,
                           color: data['isRead'] == true
