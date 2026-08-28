@@ -129,7 +129,6 @@ class _SwipeReplyMessageState extends State<_SwipeReplyMessage>
             child: widget.child,
           ),
         ],
-        ),
       ),
     );
   }
