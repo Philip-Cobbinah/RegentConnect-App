@@ -55,8 +55,14 @@ flutter run -d chrome `
   --dart-define=CALL_TURN_CREDENTIAL=replace-me
 ```
 
-Deploy `firestore.rules` before testing calls between two accounts. Web camera
-and microphone access requires HTTPS, except when running on localhost.
+Do not pass a permanent TURN username or credential into the public hosted
+web bundle. For reliable production calls across restrictive networks, use a
+small authenticated backend or Cloud Function to issue short-lived TURN
+credentials, then provide those credentials to the client at runtime. STUN
+alone can fail when users are on different mobile networks or behind
+restrictive firewalls. Deploy `firestore.rules` before testing calls between
+two accounts. Web camera and microphone access requires HTTPS, except when
+running on localhost.
 
 ## Quality checks
 

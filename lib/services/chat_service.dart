@@ -413,6 +413,12 @@ class ChatService {
 
   // Mark messages as read
   Future<void> markMessagesAsRead(String otherUserId) async {
+    final currentUser = await _firestore
+        .collection('users')
+        .doc(currentUserId)
+        .get();
+    if (currentUser.data()?['readReceipts'] == false) return;
+
     final chatRoomId = getChatRoomId(otherUserId);
     final unreadMessages = await _firestore
         .collection(AppConstants.chatsCollection)

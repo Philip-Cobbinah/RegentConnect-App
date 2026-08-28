@@ -1349,7 +1349,8 @@ class _DMScreenState extends State<DMScreen> {
                         builder: (context, snapshot) {
                           if (!snapshot.hasData) return const SizedBox();
                           final data = snapshot.data;
-                          final isOnline = data?['isOnline'] ?? false;
+                          final isOnline = data?['isOnline'] == true &&
+                              data?['showOnlineStatus'] != false;
                           return Text(
                             isOnline ? 'Online' : 'Offline',
                             style: TextStyle(
@@ -1847,8 +1848,8 @@ class _DMScreenState extends State<DMScreen> {
                       ],
                       if (isMe) ...[
                         const SizedBox(width: 4),
-                        Icon(
-                          data['isRead'] == true ? Icons.done_all : Icons.done,
+                        const Icon(
+                          Icons.done_all,
                           size: 14,
                           color: data['isRead'] == true
                               ? Colors.lightBlueAccent
@@ -3297,25 +3298,24 @@ class _DMScreenState extends State<DMScreen> {
                     Expanded(
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: RegentColors.violet.withOpacity(0.18),
                           borderRadius: BorderRadius.circular(25),
                           border: Border.all(
-                            color: RegentColors.lightViolet,
-                            width: 1.2,
+                            color: RegentColors.lightViolet.withOpacity(0.85),
+                            width: 1.4,
                           ),
                         ),
                         child: TextField(
                           controller: _messageController,
                           cursorColor: RegentColors.darkViolet,
                           style: const TextStyle(
-                            color: Colors.black87,
+                            color: Colors.white,
                             fontSize: 15,
                           ),
                           decoration: const InputDecoration(
                             hintText: 'Type a message...',
-                            hintStyle: TextStyle(color: Colors.black54),
-                            filled: true,
-                            fillColor: Colors.white,
+                            hintStyle: TextStyle(color: Colors.white70),
+                            filled: false,
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
                             focusedBorder: InputBorder.none,
