@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/official_accounts.dart';
 import '../../../core/theme.dart';
@@ -477,20 +478,15 @@ class _ChatListTabState extends State<ChatListTab> {
               : const SizedBox.shrink();
         }
 
-        final tile = _directMessageTile(user, roomData, isFavorite: isFavorite);
-        if (!unreadOnly) return tile;
-
         return StreamBuilder<int>(
           stream: _chatService.getUnreadCountForChat(otherId),
           builder: (context, unreadSnapshot) {
             final unreadCount = unreadSnapshot.data ?? 0;
-            if (unreadCount == 0) return const SizedBox.shrink();
-            return _directMessageTile(
-              user,
-              roomData,
-              unreadCount: unreadCount,
-              isFavorite: isFavorite,
-            );
+            if (unreadOnly && unreadCount == 0) {
+              return const SizedBox.shrink();
+            }
+            return _directMessageTile(user, roomData,
+                unreadCount: unreadCount, isFavorite: isFavorite);
           },
         );
       },
@@ -612,7 +608,7 @@ class _ChatListTabState extends State<ChatListTab> {
     if (date.year == now.year &&
         date.month == now.month &&
         date.day == now.day) {
-      return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+      return DateFormat('h:mm a').format(date);
     }
     return '${date.day}/${date.month}';
   }

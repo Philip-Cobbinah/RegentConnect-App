@@ -1117,9 +1117,10 @@ class ChatService {
 
   // Get total unread messages count
   Stream<int> getTotalUnreadCount() {
+    if (currentUserId.isEmpty) return Stream.value(0);
     return _firestore
         .collection(AppConstants.chatsCollection)
-        .where('participants', arrayContains: currentMessagingId)
+        .where('participantAuthIds', arrayContains: currentUserId)
         .snapshots()
         .asyncMap((chatRooms) async {
       int totalUnread = 0;
