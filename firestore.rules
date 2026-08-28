@@ -210,13 +210,26 @@ service cloud.firestore {
         allow update: if participatesIn(chatData(chatId)) &&
           (
             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-              'isRead', 'viewedBy', 'reactions', 'starredBy', 'metadata'
+              'isRead', 'viewedBy', 'reactions', 'starredBy', 'metadata',
+              'pinnedUntil', 'pinnedBy', 'pinnedDuration'
             ]) ||
+            (
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'deletedFor'
+              ]) &&
+              request.resource.data.deletedFor is list &&
+              request.resource.data.deletedFor.size() ==
+                resource.data.get('deletedFor', []).size() + 1 &&
+              request.resource.data.deletedFor.hasAll(
+                resource.data.get('deletedFor', [])
+              ) &&
+              request.resource.data.deletedFor.hasAll([messagingIdentity()])
+            ) ||
             (
               resource.data.senderAuthId == request.auth.uid &&
               resource.data.type == 'text' &&
               resource.data.isDeleted == false &&
-              request.time - resource.data.timestamp < duration.value(10, 'm') &&
+              request.time - resource.data.timestamp < duration.value(15, 'm') &&
               request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                 'message', 'content', 'editedAt'
               ])
@@ -240,6 +253,9 @@ service cloud.firestore {
                 'deletedBy',
                 'deletedByName',
                 'deletedAt',
+                'pinnedUntil',
+                'pinnedBy',
+                'pinnedDuration',
                 'reactions',
                 'starredBy',
                 'metadata'

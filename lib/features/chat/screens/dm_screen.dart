@@ -1507,11 +1507,14 @@ class _DMScreenState extends State<DMScreen> {
                                 color: RegentColors.violet));
                       }
 
-                      final messages = snapshot.data!.docs
-                          .where((doc) {
-                            final data = doc.data() as Map<String, dynamic>;
-                            return data['isDeleted'] != true;
-                          })
+                      final messages = snapshot.data!.docs.where((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        final deletedFor =
+                            List<String>.from(data['deletedFor'] ?? const []);
+                        return data['isDeleted'] != true &&
+                            !deletedFor.contains(
+                                _chatService.currentMessagingId);
+                      })
                           .toList();
 
                       if (messages.isEmpty) {
@@ -1737,10 +1740,18 @@ class _DMScreenState extends State<DMScreen> {
     );
     final isStarred =
         data['starredBy']?.contains(_chatService.currentMessagingId) ?? false;
+    final pinnedUntil = data['pinnedUntil'];
+    final isPinned = pinnedUntil is Timestamp &&
+        pinnedUntil.toDate().isAfter(DateTime.now());
     final replyTo = data['replyTo'] as Map<String, dynamic>?;
 
     return GestureDetector(
       onLongPress: () => _showMessageOptions(context, data, isMe, messageId),
+      onHorizontalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        final shouldReply = isMe ? velocity < -250 : velocity > 250;
+        if (shouldReply) _setReplyTo(data, messageId: messageId);
+      },
       child: Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Column(
@@ -1824,6 +1835,12 @@ class _DMScreenState extends State<DMScreen> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (isPinned)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 4),
+                          child: Icon(Icons.push_pin,
+                              size: 12, color: RegentColors.lightViolet),
+                        ),
                       if (isStarred)
                         const Padding(
                           padding: EdgeInsets.only(right: 4),
@@ -2528,7 +2545,7 @@ class _DMScreenState extends State<DMScreen> {
             // Message options
             _buildOptionTile(Icons.reply, 'Reply', () {
               Navigator.pop(context);
-              _setReplyTo(data);
+              _setReplyTo(data, messageId: messageId);
             }),
             _buildOptionTile(Icons.forward, 'Forward', () {
               Navigator.pop(context);
@@ -2557,11 +2574,10 @@ class _DMScreenState extends State<DMScreen> {
                 _toggleStar(messageId);
               },
             ),
-            if (isMe)
-              _buildOptionTile(Icons.delete, 'Delete', () {
-                Navigator.pop(context);
-                _deleteMessage(messageId);
-              }, isDestructive: true),
+            _buildOptionTile(Icons.delete, 'Delete for me', () {
+              Navigator.pop(context);
+              _deleteMessage(messageId);
+            }, isDestructive: true),
             _buildOptionTile(Icons.more_horiz, 'More', () {
               Navigator.pop(context);
               _showMoreOptions(context, data, isMe, messageId);
@@ -2580,7 +2596,7 @@ class _DMScreenState extends State<DMScreen> {
         data['isDeleted'] != true &&
         timestamp is Timestamp &&
         DateTime.now().difference(timestamp.toDate()) <=
-            const Duration(minutes: 10);
+            const Duration(minutes: 15);
   }
 
   Future<void> _showEditMessageDialog(
@@ -2699,7 +2715,7 @@ class _DMScreenState extends State<DMScreen> {
           ),
           _buildOptionTile(Icons.push_pin, 'Pin message', () {
             Navigator.pop(context);
-            _pinMessage(messageId);
+            _showPinDurationPicker(messageId);
           }),
           _buildOptionTile(Icons.report, 'Report', () {
             Navigator.pop(context);
@@ -2943,9 +2959,15 @@ class _DMScreenState extends State<DMScreen> {
     );
   }
 
-  void _setReplyTo(Map<String, dynamic> message) {
+  void _setReplyTo(Map<String, dynamic> message, {String? messageId}) {
     setState(() {
-      _replyingTo = message;
+      _replyingTo = {
+        'messageId': messageId ?? message['messageId'],
+        'senderId': message['senderId'],
+        'senderName': message['senderName'] ?? 'Unknown',
+        'message': message['message'] ?? message['content'] ?? '',
+        'type': message['type'] ?? 'text',
+      };
     });
   }
 
@@ -3170,12 +3192,48 @@ class _DMScreenState extends State<DMScreen> {
     }
   }
 
-  void _pinMessage(String messageId) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('Message pinned'),
-          backgroundColor: RegentColors.violet),
+  Future<void> _showPinDurationPicker(String messageId) async {
+    final duration = await showModalBottomSheet<Duration>(
+      context: context,
+      backgroundColor: RegentColors.dmSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text('Pin message for',
+                  style: TextStyle(color: Colors.white)),
+            ),
+            _buildOptionTile(Icons.today, '24 hours',
+                () => Navigator.pop(context, const Duration(hours: 24))),
+            _buildOptionTile(Icons.date_range, '7 days',
+                () => Navigator.pop(context, const Duration(days: 7))),
+            _buildOptionTile(Icons.calendar_month, '1 month',
+                () => Navigator.pop(context, const Duration(days: 30))),
+          ],
+        ),
+      ),
     );
+    if (duration == null) return;
+    try {
+      await _chatService.pinMessage(
+        otherUserId: widget.recipientId,
+        messageId: messageId,
+        duration: duration,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Message pinned')));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Message could not be pinned: $error')));
+      }
+    }
   }
 
   void _reportMessage(String messageId) {
@@ -3351,20 +3409,25 @@ class _DMScreenState extends State<DMScreen> {
                         ),
                       )
                     else
-                      IconButton(
-                        tooltip: _messageController.text.trim().isEmpty
-                            ? 'Record audio'
-                            : 'Send message',
-                        visualDensity: VisualDensity.compact,
-                        icon: Icon(
-                          _messageController.text.trim().isEmpty
-                              ? Icons.mic
-                              : Icons.send,
-                          color: RegentColors.lightViolet,
+                      GestureDetector(
+                        onLongPress: _messageController.text.trim().isEmpty
+                            ? null
+                            : () => _sendViewOnceText(),
+                        child: IconButton(
+                          tooltip: _messageController.text.trim().isEmpty
+                              ? 'Record audio'
+                              : 'Send message (hold for view once)',
+                          visualDensity: VisualDensity.compact,
+                          icon: Icon(
+                            _messageController.text.trim().isEmpty
+                                ? Icons.mic
+                                : Icons.send,
+                            color: RegentColors.lightViolet,
+                          ),
+                          onPressed: _messageController.text.trim().isEmpty
+                              ? _startRecording
+                              : _sendMessageWithReply,
                         ),
-                        onPressed: _messageController.text.trim().isEmpty
-                            ? _startRecording
-                            : _sendMessageWithReply,
                       ),
                   ],
                 ),
@@ -3373,7 +3436,13 @@ class _DMScreenState extends State<DMScreen> {
     );
   }
 
-  Future<void> _sendMessageWithReply() async {
+  Future<void> _sendViewOnceText() async {
+    if (_messageController.text.trim().isEmpty || _isSending) return;
+    final confirmed = await _promptViewOnce('message');
+    if (confirmed == true) await _sendMessageWithReply(isViewOnce: true);
+  }
+
+  Future<void> _sendMessageWithReply({bool isViewOnce = false}) async {
     final message = _messageController.text.trim();
     if (message.isEmpty || _isSending) return;
 
@@ -3385,6 +3454,7 @@ class _DMScreenState extends State<DMScreen> {
         receiverId: widget.recipientId,
         message: message,
         replyTo: _replyingTo,
+        isViewOnce: isViewOnce,
       );
       if (mounted) {
         setState(() => _replyingTo = null);

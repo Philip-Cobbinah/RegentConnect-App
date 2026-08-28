@@ -288,7 +288,7 @@ class ChatService {
       'deletedBy': currentMessagingId,
       'deletedByName': userName,
       'deletedAt': FieldValue.serverTimestamp(),
-      'deletedForMe': true,
+      'deletedFor': FieldValue.arrayUnion([currentMessagingId]),
     });
   }
 
@@ -316,8 +316,8 @@ class ChatService {
         data?['isDeleted'] == true ||
         createdAt is! Timestamp ||
         DateTime.now().difference(createdAt.toDate()) >
-            const Duration(minutes: 10)) {
-      throw Exception('Text messages can only be edited within 10 minutes.');
+            const Duration(minutes: 15)) {
+      throw Exception('Text messages can only be edited within 15 minutes.');
     }
 
     await reference.update({
@@ -366,6 +366,24 @@ class ChatService {
         if (error.code != 'object-not-found') rethrow;
       }
     }
+  }
+
+  Future<void> pinMessage({
+    required String otherUserId,
+    required String messageId,
+    required Duration duration,
+  }) async {
+    final pinnedUntil = Timestamp.fromDate(DateTime.now().add(duration));
+    await _firestore
+        .collection(AppConstants.chatsCollection)
+        .doc(getChatRoomId(otherUserId))
+        .collection('messages')
+        .doc(messageId)
+        .update({
+      'pinnedUntil': pinnedUntil,
+      'pinnedBy': currentMessagingId,
+      'pinnedDuration': duration.inHours,
+    });
   }
 
   // Get messages stream between two users - with notification
