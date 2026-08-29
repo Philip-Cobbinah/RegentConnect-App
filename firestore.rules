@@ -338,6 +338,7 @@ service cloud.firestore {
           ) ||
           (
             request.resource.data.userId == resource.data.userId &&
+            request.resource.data.likedBy is list &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'likedBy'
             ])

@@ -337,6 +337,11 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
                           ),
                         ),
                         const Spacer(),
+                        Text(
+                          '${List<String>.from(status['likedBy'] ?? const []).length} likes',
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                        const SizedBox(width: 8),
                         IconButton(
                           icon: const Icon(Icons.delete_outline,
                               color: Colors.white70),
@@ -366,6 +371,17 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
                               ),
                             ),
                           ),
+                        ),
+                        IconButton(
+                          tooltip: 'Like',
+                          icon: Icon(
+                            List<String>.from(status['likedBy'] ?? const [])
+                                    .contains(_statusService.currentUserId)
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            color: Colors.pinkAccent,
+                          ),
+                          onPressed: () => _toggleLike(status),
                         ),
                         IconButton(
                           tooltip: 'React',
@@ -420,6 +436,27 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _toggleLike(Map<String, dynamic> status) async {
+    final statusId = status['statusId']?.toString();
+    if (statusId == null || statusId.isEmpty) return;
+    try {
+      final liked = await _statusService.toggleLikeStatus(statusId);
+      final likedBy = List<String>.from(status['likedBy'] ?? const []);
+      if (liked && !likedBy.contains(_statusService.currentUserId)) {
+        likedBy.add(_statusService.currentUserId);
+      } else if (!liked) {
+        likedBy.remove(_statusService.currentUserId);
+      }
+      if (mounted) setState(() => status['likedBy'] = likedBy);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('The like could not be updated.')),
+        );
+      }
+    }
   }
 
   Widget _buildStatusContent(Map<String, dynamic> status) {

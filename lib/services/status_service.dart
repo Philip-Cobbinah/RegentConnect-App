@@ -273,6 +273,25 @@ class StatusService {
     return List<Map<String, dynamic>>.from(data['views'] ?? []);
   }
 
+  Future<bool> toggleLikeStatus(String statusId) async {
+    if (currentUserId.isEmpty) return false;
+    final reference = _firestore.collection('statuses').doc(statusId);
+    return _firestore.runTransaction((transaction) async {
+      final document = await transaction.get(reference);
+      if (!document.exists) return false;
+      final data = document.data()!;
+      final likedBy = List<String>.from(data['likedBy'] ?? const <String>[]);
+      final isLiked = likedBy.contains(currentUserId);
+      if (isLiked) {
+        likedBy.remove(currentUserId);
+      } else {
+        likedBy.add(currentUserId);
+      }
+      transaction.update(reference, {'likedBy': likedBy});
+      return !isLiked;
+    });
+  }
+
   // Reshare a status
   Future<void> reshareStatus(String originalStatusId) async {
     if (currentUserId.isEmpty) return;
