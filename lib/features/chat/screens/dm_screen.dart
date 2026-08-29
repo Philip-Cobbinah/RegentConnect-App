@@ -2169,7 +2169,6 @@ class _DMScreenState extends State<DMScreen> {
                   ),
                 ],
                 ),
-              ),
               PopupMenuButton<double>(
                 tooltip: 'Playback speed',
                 icon: const Icon(Icons.speed, color: Colors.white70, size: 20),
