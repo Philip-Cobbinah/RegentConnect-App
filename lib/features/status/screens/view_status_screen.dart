@@ -168,9 +168,9 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
       body: GestureDetector(
         onTapDown: (details) {
           final width = MediaQuery.of(context).size.width;
-          if (details.globalPosition.dx < width / 3) {
+          if (details.localPosition.dx < width / 2) {
             _previousStatus();
-          } else if (details.globalPosition.dx > width * 2 / 3) {
+          } else {
             _nextStatus();
           }
         },
@@ -261,6 +261,11 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
                               ),
                             ],
                           ),
+                        ),
+                        IconButton(
+                          tooltip: 'Status options',
+                          icon: const Icon(Icons.more_vert, color: Colors.white),
+                          onPressed: () => _showStatusOptions(status),
                         ),
                         IconButton(
                           icon: const Icon(Icons.close, color: Colors.white),
@@ -436,6 +441,109 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _showStatusOptions(Map<String, dynamic> status) async {
+    _progressController.stop();
+    await _videoController?.pause();
+    if (!mounted) return;
+
+    final isOwner = widget.isOwner;
+    final allowReshare = status['allowReshare'] == true;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: RegentColors.dmSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.visibility, color: Colors.white70),
+              title: const Text('Viewers', style: TextStyle(color: Colors.white)),
+              onTap: isOwner
+                  ? () {
+                      Navigator.pop(sheetContext);
+                      _showViewers(status);
+                    }
+                  : null,
+            ),
+            if (!isOwner)
+              ListTile(
+                leading: const Icon(Icons.reply, color: Colors.white70),
+                title: const Text('Reply', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showReplyComposer(status);
+                },
+              ),
+            if (!isOwner)
+              ListTile(
+                leading: const Icon(Icons.emoji_emotions_outlined,
+                    color: Colors.white70),
+                title: const Text('React', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showQuickReactions(status);
+                },
+              ),
+            if (!isOwner && allowReshare)
+              ListTile(
+                leading: const Icon(Icons.share, color: Colors.white70),
+                title: const Text('Reshare', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _reshareStatus(status['statusId'].toString());
+                },
+              ),
+            if (isOwner)
+              ListTile(
+                leading: Icon(
+                  allowReshare ? Icons.repeat_on_rounded : Icons.repeat_rounded,
+                  color: Colors.white70,
+                ),
+                title: Text(
+                  allowReshare ? 'Turn off resharing' : 'Turn on resharing',
+                  style: const TextStyle(color: Colors.white),
+                ),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  try {
+                    await _statusService.updateReshareSettings(
+                      status['statusId'].toString(),
+                      !allowReshare,
+                    );
+                    if (mounted) {
+                      setState(() => status['allowReshare'] = !allowReshare);
+                    }
+                  } catch (_) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Status settings could not be updated.')),
+                      );
+                    }
+                  }
+                },
+              ),
+            if (isOwner)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                title: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _deleteStatus(status['statusId'].toString());
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+    if (mounted) {
+      _progressController.forward();
+      _videoController?.play();
+    }
   }
 
   Future<void> _toggleLike(Map<String, dynamic> status) async {

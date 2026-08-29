@@ -441,61 +441,129 @@ class _CreateStatusScreenState extends State<CreateStatusScreen> {
   }
 
   Widget _buildTextStatus() {
-    return Column(
+    return Stack(
       children: [
-        Expanded(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: TextField(
-                controller: _textController,
-                autofocus: true,
-                maxLength: 700,
-                maxLines: null,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w500,
-                ),
-                decoration: const InputDecoration(
-                  counterStyle: TextStyle(color: Colors.white60),
-                  hintText: 'Type a status...',
-                  hintStyle: TextStyle(color: Colors.white54, fontSize: 24),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  fillColor: Colors.transparent,
+        Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: TextField(
+                    controller: _textController,
+                    autofocus: true,
+                    maxLength: 700,
+                    maxLines: null,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    decoration: const InputDecoration(
+                      counterStyle: TextStyle(color: Colors.white60),
+                      hintText: 'Type a status...',
+                      hintStyle: TextStyle(color: Colors.white54, fontSize: 24),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      fillColor: Colors.transparent,
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: _backgroundColors.map((color) {
+                  final isSelected = color == _selectedColor;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedColor = color),
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
+                      width: isSelected ? 40 : 32,
+                      height: isSelected ? 40 : 32,
+                      decoration: BoxDecoration(
+                        color: Color(int.parse(color.replaceFirst('#', '0xFF'))),
+                        shape: BoxShape.circle,
+                        border: isSelected
+                            ? Border.all(color: Colors.white, width: 3)
+                            : null,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
         ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: _backgroundColors.map((color) {
-              final isSelected = color == _selectedColor;
-              return GestureDetector(
-                onTap: () => setState(() => _selectedColor = color),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 6),
-                  width: isSelected ? 40 : 32,
-                  height: isSelected ? 40 : 32,
-                  decoration: BoxDecoration(
-                    color: Color(int.parse(color.replaceFirst('#', '0xFF'))),
-                    shape: BoxShape.circle,
-                    border: isSelected
-                        ? Border.all(color: Colors.white, width: 3)
-                        : null,
-                  ),
-                ),
-              );
-            }).toList(),
+        Positioned(
+          top: 20,
+          right: 20,
+          child: IconButton(
+            tooltip: 'Add emoji',
+            onPressed: _showEmojiPicker,
+            icon: const Icon(Icons.emoji_emotions_outlined,
+                color: Colors.white, size: 30),
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _showEmojiPicker() async {
+    const emojis = <String>[
+      '\u{1F600}', '\u{1F603}', '\u{1F604}', '\u{1F601}', '\u{1F606}',
+      '\u{1F605}', '\u{1F602}', '\u{1F923}', '\u{1F60A}', '\u{1F642}',
+      '\u{1F643}', '\u{1F609}', '\u{1F60D}', '\u{1F970}', '\u{1F618}',
+      '\u{1F60E}', '\u{1F914}', '\u{1F62E}', '\u{1F622}', '\u{1F62D}',
+      '\u{1F621}', '\u{1F64F}', '\u{1F44F}', '\u{1F44D}', '\u{1F44E}',
+      '\u{2764}\u{FE0F}', '\u{1F525}', '\u{1F389}', '\u{2728}',
+      '\u{1F4AF}', '\u{1F393}', '\u{1F4DA}',
+    ];
+    /*
+      '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣',
+      '😊', '🙂', '🙃', '😉', '😍', '🥰', '😘', '😎',
+      '🤔', '😮', '😢', '😭', '😡', '🙏', '👏', '👍',
+      '👎', '❤️', '🔥', '🎉', '✨', '💯', '🎓', '📚',
+    ];*/
+    final emoji = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: RegentColors.dmSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: GridView.builder(
+          shrinkWrap: true,
+          padding: const EdgeInsets.all(18),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 8,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 8,
+          ),
+          itemCount: emojis.length,
+          itemBuilder: (context, index) => InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => Navigator.pop(context, emojis[index]),
+            child: Center(
+              child: Text(emojis[index], style: const TextStyle(fontSize: 26)),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (emoji == null || !mounted) return;
+    final text = _textController.text;
+    final selection = _textController.selection;
+    final start = selection.start < 0 ? text.length : selection.start;
+    final end = selection.end < 0 ? start : selection.end;
+    final updated = text.replaceRange(start, end, emoji);
+    _textController.value = TextEditingValue(
+      text: updated,
+      selection: TextSelection.collapsed(offset: start + emoji.length),
     );
   }
 

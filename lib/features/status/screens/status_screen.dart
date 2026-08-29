@@ -35,7 +35,8 @@ class _StatusScreenState extends State<StatusScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.more_vert, color: Colors.white),
-            onPressed: () {},
+            tooltip: 'Status options',
+            onPressed: _showStatusOptions,
           ),
         ],
       ),
@@ -329,6 +330,65 @@ class _StatusScreenState extends State<StatusScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => const CreateStatusScreen(type: 'text'),
+      ),
+    );
+  }
+
+  void _showStatusOptions() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: RegentColors.dmSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.add_circle_outline, color: Colors.white70),
+              title: const Text('Create a status', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _showMediaOptions();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.privacy_tip_outlined, color: Colors.white70),
+              title: const Text('Status privacy', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Choose who can see future statuses',
+                  style: TextStyle(color: Colors.white54)),
+              onTap: () {
+                Navigator.pop(context);
+                _showStatusPrivacyInfo();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.refresh, color: Colors.white70),
+              title: const Text('Refresh statuses', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                setState(() {});
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showStatusPrivacyInfo() {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Status privacy'),
+        content: const Text(
+          'Statuses are currently visible to signed-in Regent Connect users. '
+          'Use group tagging when you want to highlight a specific community.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Done')),
+        ],
       ),
     );
   }
