@@ -1041,7 +1041,7 @@ class _CreateStatusScreenState extends State<CreateStatusScreen> {
     );
   }
 
-  void _showEmojiPicker() {
+  void _showLegacyEmojiPicker() {
     const emojis = [
       '😀',
       '😂',
