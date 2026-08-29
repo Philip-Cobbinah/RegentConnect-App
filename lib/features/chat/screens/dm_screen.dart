@@ -2111,6 +2111,7 @@ class _DMScreenState extends State<DMScreen> {
                 ],
               ),
             ),
+            ),
             const SizedBox(height: 7),
             Text(
               message,
