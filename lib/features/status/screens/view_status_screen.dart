@@ -773,6 +773,7 @@ class _ViewStatusScreenState extends State<ViewStatusScreen>
     return {
       'isStatusReply': true,
       'statusId': status['statusId'],
+      'statusPosterId': status['userId'],
       'statusType': status['type'],
       'statusText': status['text'],
       'statusMediaUrl': status['mediaUrl'],

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme.dart';
 import '../../../models/group_model.dart';
@@ -544,8 +545,7 @@ class _StatusTabState extends State<StatusTab> {
     final isToday =
         date.year == now.year && date.month == now.month && date.day == now.day;
     if (isToday) {
-      return '${date.hour.toString().padLeft(2, '0')}:'
-          '${date.minute.toString().padLeft(2, '0')}';
+      return DateFormat('h:mm a').format(date);
     }
     return '${date.day}/${date.month}';
   }

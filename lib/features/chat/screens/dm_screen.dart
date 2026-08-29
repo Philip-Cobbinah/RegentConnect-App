@@ -22,6 +22,7 @@ import '../../../services/call_service.dart';
 import '../../../services/notification_service.dart';
 import '../../calls/screens/video_call_screen.dart';
 import '../../ai_bot/screens/regent_ai_screen.dart';
+import '../../status/screens/view_status_screen.dart';
 import '../../../widgets/active_call_overlay.dart';
 import '../widgets/chat_media_viewer.dart';
 
@@ -2042,20 +2043,22 @@ class _DMScreenState extends State<DMScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(9),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(9),
-                border: const Border(
-                  left: BorderSide(
-                    color: RegentColors.lightViolet,
-                    width: 3,
+            GestureDetector(
+              onTap: () => _openStatusReply(metadata),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(9),
+                  border: const Border(
+                    left: BorderSide(
+                      color: RegentColors.lightViolet,
+                      width: 3,
+                    ),
                   ),
                 ),
-              ),
-              child: Row(
+                child: Row(
                 children: [
                   if (statusMediaUrl?.isNotEmpty == true &&
                       statusType == 'image')
@@ -2107,6 +2110,7 @@ class _DMScreenState extends State<DMScreen> {
                   ),
                 ],
               ),
+            ),
             ),
             const SizedBox(height: 7),
             Text(
@@ -2165,6 +2169,7 @@ class _DMScreenState extends State<DMScreen> {
                     style: const TextStyle(color: Colors.white60, fontSize: 12),
                   ),
                 ],
+                ),
               ),
               PopupMenuButton<double>(
                 tooltip: 'Playback speed',
@@ -3587,6 +3592,33 @@ class _DMScreenState extends State<DMScreen> {
         const SnackBar(content: Text('The attachment could not be opened')),
       );
     }
+  }
+
+  void _openStatusReply(Map<String, dynamic> metadata) {
+    final statusId = metadata['statusId']?.toString();
+    if (statusId == null || statusId.isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ViewStatusScreen(
+          isOwner: false,
+          statuses: [
+            {
+              'statusId': statusId,
+              'userId': metadata['statusPosterId'] ?? widget.recipientId,
+              'userName': metadata['statusPosterName'] ?? widget.recipientName,
+              'type': metadata['statusType'] ?? 'text',
+              'text': metadata['statusText'],
+              'mediaUrl': metadata['statusMediaUrl'],
+              'backgroundColor': '#7C4DFF',
+              'expiresAt': Timestamp.fromDate(
+                DateTime.now().add(const Duration(minutes: 1)),
+              ),
+            },
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _sendMessageWithReply({bool isViewOnce = false}) async {
