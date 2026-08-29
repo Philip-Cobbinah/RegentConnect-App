@@ -461,7 +461,7 @@ class ChatService {
     }
     return _firestore
         .collection(AppConstants.chatsCollection)
-        .where('participantAuthIds', arrayContains: currentUserId)
+        .where('participants', arrayContains: currentMessagingId)
         .snapshots();
   }
 
@@ -1120,7 +1120,7 @@ class ChatService {
     if (currentUserId.isEmpty) return Stream.value(0);
     return _firestore
         .collection(AppConstants.chatsCollection)
-        .where('participantAuthIds', arrayContains: currentUserId)
+        .where('participants', arrayContains: currentMessagingId)
         .snapshots()
         .asyncMap((chatRooms) async {
       int totalUnread = 0;
