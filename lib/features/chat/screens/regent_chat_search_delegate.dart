@@ -39,6 +39,37 @@ class RegentChatSearchDelegate extends SearchDelegate<void> {
   @override
   List<Widget> buildActions(BuildContext context) {
     return [
+      PopupMenuButton<String>(
+        tooltip: 'Filter search',
+        icon: const Icon(Icons.tune),
+        onSelected: (value) => query = value == 'all' ? '' : 'type:$value ',
+        itemBuilder: (_) => const [
+          PopupMenuItem(value: 'all', child: Text('All')),
+          PopupMenuItem(value: 'image', child: Text('Photos')),
+          PopupMenuItem(value: 'video', child: Text('Videos')),
+          PopupMenuItem(value: 'link', child: Text('Links')),
+          PopupMenuItem(value: 'audio', child: Text('Audio')),
+          PopupMenuItem(value: 'file', child: Text('Documents')),
+          PopupMenuItem(value: 'poll', child: Text('Polls')),
+        ],
+      ),
+      IconButton(
+        tooltip: 'Search by date',
+        icon: const Icon(Icons.calendar_month_outlined),
+        onPressed: () async {
+          final date = await showDatePicker(
+            context: context,
+            firstDate: DateTime(2020),
+            lastDate: DateTime.now(),
+            initialDate: DateTime.now(),
+          );
+          if (date != null) {
+            query = 'date:${date.year.toString().padLeft(4, '0')}-'
+                '${date.month.toString().padLeft(2, '0')}-'
+                '${date.day.toString().padLeft(2, '0')} ';
+          }
+        },
+      ),
       if (query.isNotEmpty)
         IconButton(
           tooltip: 'Clear search',
@@ -187,7 +218,8 @@ class _SearchResultsState extends State<_SearchResults> {
   }
 
   Future<_SearchData> _search(String query) async {
-    final needle = query.toLowerCase();
+    final parsed = _ParsedSearch.parse(query);
+    final needle = parsed.text.toLowerCase();
     try {
       final snapshots = await Future.wait([
         FirebaseFirestore.instance.collection('users').get(),
@@ -272,7 +304,7 @@ class _SearchResultsState extends State<_SearchResults> {
         ])) {
           chatMatches.add(_SearchChat(contact: contact, roomData: roomData));
         }
-        messageJobs.add(_findMessages(room.id, contact, needle));
+        messageJobs.add(_findMessages(room.id, contact, needle, parsed));
       }
 
       final messageLists = await Future.wait(messageJobs);
@@ -304,6 +336,7 @@ class _SearchResultsState extends State<_SearchResults> {
     String chatId,
     _SearchContact contact,
     String needle,
+    _ParsedSearch parsed,
   ) async {
     try {
       final snapshot = await FirebaseFirestore.instance
@@ -315,8 +348,20 @@ class _SearchResultsState extends State<_SearchResults> {
       return snapshot.docs
           .where((document) {
             final data = document.data();
-            return data['isDeleted'] != true &&
-                _matches(needle, [data['message'], data['content']]);
+            final timestamp = data['timestamp'];
+            final dateMatches = parsed.date == null ||
+                (timestamp is Timestamp &&
+                    DateFormat('yyyy-MM-dd').format(timestamp.toDate()) == parsed.date);
+            final type = (data['type'] ?? 'text').toString();
+            final typeMatches = parsed.type == null ||
+                (parsed.type == 'link'
+                    ? _matches('http', [data['message'], data['content']])
+                    : type == parsed.type);
+            final senderMatches = parsed.from == null ||
+                _matches(parsed.from!, [data['senderName'], data['senderEmail']]);
+            return data['isDeleted'] != true && dateMatches && typeMatches &&
+                senderMatches &&
+                (needle.isEmpty || _matches(needle, [data['message'], data['content']]));
           })
           .map(
             (document) => _SearchMessage(
@@ -532,6 +577,31 @@ class _SearchResultsState extends State<_SearchResults> {
       return DateFormat('h:mm a').format(date);
     }
     return '${date.day}/${date.month}';
+  }
+}
+
+class _ParsedSearch {
+  const _ParsedSearch({required this.text, this.type, this.date, this.from});
+
+  final String text;
+  final String? type;
+  final String? date;
+  final String? from;
+
+  static _ParsedSearch parse(String value) {
+    var text = value;
+    String? read(String key) {
+      final match = RegExp('$key:([^ ]+)').firstMatch(text);
+      if (match == null) return null;
+      text = text.replaceFirst(match.group(0)!, '').trim();
+      return match.group(1)!.toLowerCase();
+    }
+    return _ParsedSearch(
+      text: text,
+      type: read('type'),
+      date: read('date'),
+      from: read('from'),
+    );
   }
 }
 
