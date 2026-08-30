@@ -13,6 +13,10 @@ class GroupModel {
   final String kind;
   final bool allowMemberStatusTagging;
   final bool membersCanPost;
+  final bool requireApproval;
+  final bool onlyAdminsEditInfo;
+  final bool inviteLinkEnabled;
+  final List<String> pendingMembers;
   final String lastMessage;
 
   // Aliases for compatibility
@@ -37,9 +41,14 @@ class GroupModel {
     this.kind = 'group',
     this.allowMemberStatusTagging = true,
     bool? membersCanPost,
+    this.requireApproval = false,
+    this.onlyAdminsEditInfo = true,
+    this.inviteLinkEnabled = true,
+    List<String>? pendingMembers,
     this.lastMessage = '',
   })  : admins = admins ?? [createdBy],
-        membersCanPost = membersCanPost ?? kind != 'channel';
+        membersCanPost = membersCanPost ?? kind != 'channel',
+        pendingMembers = pendingMembers ?? const [];
 
   bool isAdmin(String userId) => createdBy == userId || admins.contains(userId);
 
@@ -64,6 +73,10 @@ class GroupModel {
       'kind': kind,
       'allowMemberStatusTagging': allowMemberStatusTagging,
       'membersCanPost': membersCanPost,
+      'requireApproval': requireApproval,
+      'onlyAdminsEditInfo': onlyAdminsEditInfo,
+      'inviteLinkEnabled': inviteLinkEnabled,
+      'pendingMembers': pendingMembers,
       'lastMessage': lastMessage,
     };
   }
@@ -89,6 +102,10 @@ class GroupModel {
       kind: map['kind'] ?? map['type'] ?? 'group',
       allowMemberStatusTagging: map['allowMemberStatusTagging'] ?? true,
       membersCanPost: map['membersCanPost'],
+      requireApproval: map['requireApproval'] == true,
+      onlyAdminsEditInfo: map['onlyAdminsEditInfo'] != false,
+      inviteLinkEnabled: map['inviteLinkEnabled'] != false,
+      pendingMembers: List<String>.from(map['pendingMembers'] ?? const []),
       lastMessage: (map['lastMessage'] ?? '').toString(),
     );
   }

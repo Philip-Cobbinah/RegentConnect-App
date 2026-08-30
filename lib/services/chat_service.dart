@@ -1108,6 +1108,83 @@ class ChatService {
     });
   }
 
+  Future<void> updateGroupGovernance({
+    required String groupId,
+    bool? membersCanPost,
+    bool? requireApproval,
+    bool? onlyAdminsEditInfo,
+    bool? inviteLinkEnabled,
+  }) async {
+    final updates = <String, dynamic>{};
+    if (membersCanPost != null) updates['membersCanPost'] = membersCanPost;
+    if (requireApproval != null) updates['requireApproval'] = requireApproval;
+    if (onlyAdminsEditInfo != null) {
+      updates['onlyAdminsEditInfo'] = onlyAdminsEditInfo;
+    }
+    if (inviteLinkEnabled != null) {
+      updates['inviteLinkEnabled'] = inviteLinkEnabled;
+    }
+    if (updates.isEmpty) return;
+    final reference = _firestore.collection('groups').doc(groupId);
+    final document = await reference.get();
+    if (!document.exists || !isGroupAdminData(document.data())) {
+      throw Exception('Only a group admin can change these settings.');
+    }
+    await reference.update(updates);
+  }
+
+  bool isGroupAdminData(Map<String, dynamic>? data) {
+    if (data == null || currentUserId.isEmpty) return false;
+    return data['createdBy'] == currentUserId ||
+        List<String>.from(data['admins'] ?? const []).contains(currentUserId);
+  }
+
+  Future<void> updateGroupMember({
+    required String groupId,
+    required String memberId,
+    required bool add,
+    bool makeAdmin = false,
+  }) async {
+    final reference = _firestore.collection('groups').doc(groupId);
+    final document = await reference.get();
+    final data = document.data();
+    if (!document.exists || !isGroupAdminData(data)) {
+      throw Exception('Only a group admin can manage members.');
+    }
+    if (add) {
+      final updates = <String, dynamic>{
+        'members': FieldValue.arrayUnion([memberId]),
+        'pendingMembers': FieldValue.arrayRemove([memberId]),
+      };
+      if (makeAdmin) updates['admins'] = FieldValue.arrayUnion([memberId]);
+      await reference.update(updates);
+    } else if (memberId != data?['createdBy']) {
+      await reference.update({
+        'members': FieldValue.arrayRemove([memberId]),
+        'admins': FieldValue.arrayRemove([memberId]),
+        'pendingMembers': FieldValue.arrayRemove([memberId]),
+      });
+    }
+  }
+
+  Future<void> updateGroupAdmin({
+    required String groupId,
+    required String memberId,
+    required bool makeAdmin,
+  }) async {
+    final reference = _firestore.collection('groups').doc(groupId);
+    final document = await reference.get();
+    final data = document.data();
+    if (!document.exists || !isGroupAdminData(data)) {
+      throw Exception('Only a group admin can change administrators.');
+    }
+    await reference.update({
+      'admins': makeAdmin
+          ? FieldValue.arrayUnion([memberId])
+          : FieldValue.arrayRemove([memberId]),
+    });
+  }
+
   // Clear chat (soft delete all messages for current user)
   Future<void> clearChat(String otherUserId) async {
     final chatRoomId = getChatRoomId(otherUserId);

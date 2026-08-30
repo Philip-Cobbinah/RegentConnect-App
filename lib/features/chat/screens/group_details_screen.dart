@@ -51,6 +51,68 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
     }
   }
 
+  Future<void> _updateGovernance(
+    String groupId, {
+    bool? membersCanPost,
+    bool? requireApproval,
+    bool? inviteLinkEnabled,
+  }) async {
+    setState(() => _isUpdating = true);
+    try {
+      await _chatService.updateGroupGovernance(
+        groupId: groupId,
+        membersCanPost: membersCanPost,
+        requireApproval: requireApproval,
+        inviteLinkEnabled: inviteLinkEnabled,
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _isUpdating = false);
+    }
+  }
+
+  Future<void> _manageMember(
+    String groupId,
+    String memberId, {
+    required bool add,
+  }) async {
+    try {
+      await _chatService.updateGroupMember(
+        groupId: groupId,
+        memberId: memberId,
+        add: add,
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    }
+  }
+
+  Future<void> _updateAdmin(
+    String groupId,
+    String memberId,
+    bool makeAdmin,
+  ) async {
+    try {
+      await _chatService.updateGroupAdmin(
+        groupId: groupId,
+        memberId: memberId,
+        makeAdmin: makeAdmin,
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot>(
@@ -152,6 +214,42 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                           ? (value) => _updateTagging(group, value)
                           : null,
                     ),
+                    if (!group.isChannel)
+                      SwitchListTile(
+                        secondary: const Icon(Icons.forum_outlined),
+                        title: const Text('Members can send messages'),
+                        subtitle: const Text('Turn off for announcement-only mode.'),
+                        value: group.membersCanPost,
+                        onChanged: isAdmin && !_isUpdating
+                            ? (value) => _updateGovernance(
+                                  group.id,
+                                  membersCanPost: value,
+                                )
+                            : null,
+                      ),
+                    SwitchListTile(
+                      secondary: const Icon(Icons.how_to_reg_outlined),
+                      title: const Text('Approve new members'),
+                      subtitle: const Text('Admins approve requests before users join.'),
+                      value: group.requireApproval,
+                      onChanged: isAdmin && !_isUpdating
+                          ? (value) => _updateGovernance(
+                                group.id,
+                                requireApproval: value,
+                              )
+                          : null,
+                    ),
+                    SwitchListTile(
+                      secondary: const Icon(Icons.link_outlined),
+                      title: const Text('Allow invite link'),
+                      value: group.inviteLinkEnabled,
+                      onChanged: isAdmin && !_isUpdating
+                          ? (value) => _updateGovernance(
+                                group.id,
+                                inviteLinkEnabled: value,
+                              )
+                            : null,
+                    ),
                     if (group.isChannel) ...[
                       const Divider(height: 1),
                       const ListTile(
@@ -214,10 +312,57 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                 ),
               ),
               const SizedBox(height: 8),
+              if (isAdmin && group.pendingMembers.isNotEmpty)
+                Card(
+                  child: Column(
+                    children: [
+                      const ListTile(
+                        leading: Icon(Icons.pending_actions),
+                        title: Text('Pending approvals'),
+                      ),
+                      for (final memberId in group.pendingMembers)
+                        ListTile(
+                          title: Text(memberId),
+                          trailing: Wrap(
+                            children: [
+                              IconButton(
+                                tooltip: 'Approve',
+                                icon: const Icon(Icons.check, color: Colors.green),
+                                onPressed: () => _manageMember(
+                                  group.id,
+                                  memberId,
+                                  add: true,
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Reject',
+                                icon: const Icon(Icons.close, color: Colors.red),
+                                onPressed: () => _manageMember(
+                                  group.id,
+                                  memberId,
+                                  add: false,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              if (isAdmin && group.pendingMembers.isNotEmpty)
+                const SizedBox(height: 8),
               for (final memberId in group.members)
                 _MemberTile(
                   memberId: memberId,
                   isAdmin: group.isAdmin(memberId),
+                  canManage: isAdmin && memberId != group.createdBy,
+                  onToggleAdmin: (value) =>
+                      _updateAdmin(group.id, memberId, value),
+                  onRemove: () => _manageMember(
+                    group.id,
+                    memberId,
+                    add: false,
+                  ),
                 ),
             ],
           ),
@@ -230,10 +375,16 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
 class _MemberTile extends StatelessWidget {
   final String memberId;
   final bool isAdmin;
+  final bool canManage;
+  final ValueChanged<bool>? onToggleAdmin;
+  final VoidCallback? onRemove;
 
   const _MemberTile({
     required this.memberId,
     required this.isAdmin,
+    this.canManage = false,
+    this.onToggleAdmin,
+    this.onRemove,
   });
 
   @override
@@ -259,12 +410,29 @@ class _MemberTile extends StatelessWidget {
           ),
           title: Text(name),
           subtitle: isAdmin ? const Text('Admin') : null,
-          trailing: isAdmin
-              ? const Icon(
-                  Icons.admin_panel_settings,
-                  color: RegentColors.violet,
+          trailing: canManage
+              ? PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'admin') onToggleAdmin?.call(!isAdmin);
+                    if (value == 'remove') onRemove?.call();
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'admin',
+                      child: Text(isAdmin ? 'Dismiss admin' : 'Make admin'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'remove',
+                      child: Text('Remove from group'),
+                    ),
+                  ],
                 )
-              : null,
+              : isAdmin
+                  ? const Icon(
+                      Icons.admin_panel_settings,
+                      color: RegentColors.violet,
+                    )
+                  : null,
         );
       },
     );
