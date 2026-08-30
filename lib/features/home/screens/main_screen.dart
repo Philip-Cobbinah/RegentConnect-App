@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../services/call_service.dart';
@@ -11,6 +14,7 @@ import '../../chat/screens/chat_list_tab.dart';
 import '../../chat/screens/regent_chat_search_delegate.dart';
 import '../../calls/screens/calls_tab.dart';
 import '../../status/screens/status_tab.dart';
+import '../../status/screens/view_status_screen.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../../p_questions/screens/academics_tab.dart';
 
@@ -24,12 +28,71 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   int _selectedFilter = 0;
+  StreamSubscription<QuerySnapshot>? _statusSubscription;
+  final Set<String> _knownStatusIds = <String>{};
+  bool _hasLoadedStatuses = false;
+  Map<String, dynamic>? _newStatusNotice;
+  Timer? _statusNoticeTimer;
 
   final _chatService = ChatService();
   final _callService = CallService();
   final _statusService = StatusService();
 
   final List<String> _filters = ['All', 'Unread', 'Favorites', 'Groups'];
+
+  @override
+  void initState() {
+    super.initState();
+    _listenForStatusUpdates();
+  }
+
+  void _listenForStatusUpdates() {
+    _statusSubscription = _statusService.getAllStatuses().listen((snapshot) {
+      final isFirstSnapshot = !_hasLoadedStatuses;
+      final newStatuses = <Map<String, dynamic>>[];
+      for (final change in snapshot.docChanges) {
+        final data = change.doc.data() as Map<String, dynamic>;
+        final statusId = change.doc.id;
+        if (change.type == DocumentChangeType.added &&
+            !_knownStatusIds.contains(statusId) &&
+            data['userId'] != _statusService.currentUserId) {
+          newStatuses.add({...data, 'statusId': statusId});
+        }
+        _knownStatusIds.add(statusId);
+      }
+      _hasLoadedStatuses = true;
+      if (isFirstSnapshot || newStatuses.isEmpty || !mounted) return;
+      _showNewStatusNotice(newStatuses.last);
+    });
+  }
+
+  void _showNewStatusNotice(Map<String, dynamic> status) {
+    _statusNoticeTimer?.cancel();
+    setState(() => _newStatusNotice = status);
+    _statusNoticeTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _newStatusNotice = null);
+    });
+  }
+
+  void _openNewStatusNotice() {
+    final status = _newStatusNotice;
+    _statusNoticeTimer?.cancel();
+    setState(() => _newStatusNotice = null);
+    if (status == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ViewStatusScreen(statuses: [status], isOwner: false),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _statusNoticeTimer?.cancel();
+    _statusSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,6 +131,62 @@ class _MainScreenState extends State<MainScreen> {
 
           // Regent AI FAB
           const RegentAICrystalFab(),
+
+          if (_newStatusNotice != null)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              left: 16,
+              right: 16,
+              child: GestureDetector(
+                onTap: _openNewStatusNotice,
+                child: Material(
+                  elevation: 10,
+                  color: RegentColors.dmSurface,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 11,
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: RegentColors.violet,
+                          backgroundImage:
+                              _newStatusNotice!['userPhoto'] != null
+                                  ? NetworkImage(
+                                      _newStatusNotice!['userPhoto'].toString(),
+                                    )
+                                  : null,
+                          child: _newStatusNotice!['userPhoto'] == null
+                              ? Text(
+                                  (_newStatusNotice!['userName'] ?? 'U')
+                                      .toString()
+                                      .characters
+                                      .first
+                                      .toUpperCase(),
+                                  style: const TextStyle(color: Colors.white),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '${_newStatusNotice!['userName'] ?? 'Someone'} added a new status',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right, color: Colors.white70),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
