@@ -146,6 +146,7 @@ class _DMScreenState extends State<DMScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   bool _isSending = false;
+  String _messageSearchQuery = '';
   bool _isStartingCall = false;
   bool _isChatReady = false;
   String? _chatInitializationError;
@@ -432,6 +433,38 @@ class _DMScreenState extends State<DMScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _showInChatSearch() async {
+    final controller = TextEditingController(text: _messageSearchQuery);
+    final query = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Search in chat'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Search messages',
+            prefixIcon: Icon(Icons.search),
+          ),
+          onSubmitted: (value) => Navigator.pop(dialogContext, value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, ''),
+            child: const Text('Clear'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('Search'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (!mounted || query == null) return;
+    setState(() => _messageSearchQuery = query.trim().toLowerCase());
   }
 
   void _listenForNewMessages() {
@@ -1534,9 +1567,24 @@ class _DMScreenState extends State<DMScreen> {
                 _showWallpaperPicker();
               } else if (value == 'disappearing') {
                 _showDisappearingOptions();
+              } else if (value == 'search') {
+                _showInChatSearch();
+              } else if (value == 'clear_search') {
+                setState(() => _messageSearchQuery = '');
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'search',
+                child: Text('Search in chat',
+                    style: TextStyle(color: Colors.white)),
+              ),
+              if (_messageSearchQuery.isNotEmpty)
+                const PopupMenuItem(
+                  value: 'clear_search',
+                  child: Text('Clear search',
+                      style: TextStyle(color: Colors.white)),
+                ),
               const PopupMenuItem(
                 value: 'wallpaper',
                 child: Text('Chat wallpaper',
@@ -1651,8 +1699,14 @@ class _DMScreenState extends State<DMScreen> {
                         final expiresAt = data['expiresAt'];
                         final isExpired = expiresAt is Timestamp &&
                             !expiresAt.toDate().isAfter(DateTime.now());
+                        final searchableText =
+                            (data['message'] ?? data['content'] ?? '')
+                                .toString()
+                                .toLowerCase();
                         return data['isDeleted'] != true &&
                             !isExpired &&
+                            (_messageSearchQuery.isEmpty ||
+                                searchableText.contains(_messageSearchQuery)) &&
                             !deletedFor.contains(
                                 _chatService.currentMessagingId);
                       })
