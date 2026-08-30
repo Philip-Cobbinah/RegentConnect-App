@@ -121,6 +121,9 @@ class ChatService {
 
     final chatReference =
         _firestore.collection(AppConstants.chatsCollection).doc(chatRoomId);
+    final roomSnapshot = await chatReference.get();
+    final disappearingHours =
+        (roomSnapshot.data()?['disappearingDurationHours'] as num?)?.toInt();
     final messageReference = chatReference.collection('messages').doc();
     final messageData = <String, dynamic>{
       'id': messageReference.id,
@@ -146,6 +149,10 @@ class ChatService {
       'viewedBy': <String>[],
       'timestamp': timestamp,
       'createdAt': timestamp,
+      if (disappearingHours != null && disappearingHours > 0)
+        'expiresAt': Timestamp.fromDate(
+          DateTime.now().add(Duration(hours: disappearingHours)),
+        ),
       'isRead': false,
       'isDeleted': false,
       'reactions': {},
@@ -529,6 +536,20 @@ class ChatService {
         .collection(AppConstants.chatsCollection)
         .doc(roomId)
         .update(updates);
+  }
+
+  Future<void> setDisappearingDuration(
+    String otherUserId,
+    int? durationHours,
+  ) async {
+    await ensureChatRoom(otherUserId);
+    final value = durationHours == null
+        ? FieldValue.delete()
+        : durationHours;
+    await _firestore
+        .collection(AppConstants.chatsCollection)
+        .doc(getChatRoomId(otherUserId))
+        .update({'disappearingDurationHours': value});
   }
 
   Future<UploadedMedia?> uploadMediaBytes(

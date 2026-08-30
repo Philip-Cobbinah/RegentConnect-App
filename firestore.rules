@@ -196,6 +196,7 @@ service cloud.firestore {
           'archivedBy',
           'mutedUntilBy',
           'manualUnreadBy',
+          'disappearingDurationHours',
           'updatedAt'
         ]);
       allow delete: if false;

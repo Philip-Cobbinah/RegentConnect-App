@@ -399,6 +399,41 @@ class _DMScreenState extends State<DMScreen> {
     });
   }
 
+  Future<void> _showDisappearingOptions() async {
+    final hours = await showModalBottomSheet<int?>(
+      context: context,
+      backgroundColor: RegentColors.dmSurface,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final option in <MapEntry<String, int?>>[
+              const MapEntry('Off', null),
+              const MapEntry('24 hours', 24),
+              const MapEntry('7 days', 24 * 7),
+              const MapEntry('90 days', 24 * 90),
+            ])
+              ListTile(
+                title: Text(option.key),
+                onTap: () => Navigator.pop(context, option.value),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await _chatService.setDisappearingDuration(widget.recipientId, hours);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(hours == null
+              ? 'Disappearing messages turned off'
+              : 'New messages disappear after ${hours == 24 ? '24 hours' : hours == 168 ? '7 days' : '90 days'}'),
+        ),
+      );
+    }
+  }
+
   void _listenForNewMessages() {
     _messageSubscription =
         _chatService.getMessages(widget.recipientId).listen((snapshot) {
@@ -1497,6 +1532,8 @@ class _DMScreenState extends State<DMScreen> {
                 _showClearChatDialog();
               } else if (value == 'wallpaper') {
                 _showWallpaperPicker();
+              } else if (value == 'disappearing') {
+                _showDisappearingOptions();
               }
             },
             itemBuilder: (context) => [
@@ -1508,7 +1545,12 @@ class _DMScreenState extends State<DMScreen> {
               const PopupMenuItem(
                 value: 'clear',
                 child:
-                    Text('Clear chat', style: TextStyle(color: Colors.white)),
+                  Text('Clear chat', style: TextStyle(color: Colors.white)),
+              ),
+              const PopupMenuItem(
+                value: 'disappearing',
+                child: Text('Disappearing messages',
+                    style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -1606,7 +1648,11 @@ class _DMScreenState extends State<DMScreen> {
                         final data = doc.data() as Map<String, dynamic>;
                         final deletedFor =
                             List<String>.from(data['deletedFor'] ?? const []);
+                        final expiresAt = data['expiresAt'];
+                        final isExpired = expiresAt is Timestamp &&
+                            !expiresAt.toDate().isAfter(DateTime.now());
                         return data['isDeleted'] != true &&
+                            !isExpired &&
                             !deletedFor.contains(
                                 _chatService.currentMessagingId);
                       })
