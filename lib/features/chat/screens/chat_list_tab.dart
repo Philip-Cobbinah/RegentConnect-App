@@ -6,6 +6,7 @@ import '../../../core/official_accounts.dart';
 import '../../../core/theme.dart';
 import '../../../models/group_model.dart';
 import '../../../services/chat_service.dart';
+import '../../../services/block_service.dart';
 import '../../../services/official_office_service.dart';
 import '../../auth/screens/officer_access_screen.dart';
 import 'community_chat_screen.dart';
@@ -24,6 +25,7 @@ class ChatListTab extends StatefulWidget {
 class _ChatListTabState extends State<ChatListTab> {
   final ChatService _chatService = ChatService();
   final OfficialOfficeService _officeService = OfficialOfficeService();
+  final BlockService _blockService = BlockService();
 
   @override
   Widget build(BuildContext context) {
@@ -85,6 +87,7 @@ class _ChatListTabState extends State<ChatListTab> {
         _buildDirectMessages(
           unreadOnly: widget.filter == 'Unread',
           favoriteOnly: widget.filter == 'Favorites',
+          archivedOnly: widget.filter == 'Archived',
         ),
       ],
     );
@@ -379,6 +382,7 @@ class _ChatListTabState extends State<ChatListTab> {
   Widget _buildDirectMessages({
     required bool unreadOnly,
     required bool favoriteOnly,
+    required bool archivedOnly,
   }) {
     return StreamBuilder<Set<String>>(
       stream: _chatService.getFavoriteContactIds(),
@@ -406,6 +410,15 @@ class _ChatListTabState extends State<ChatListTab> {
             rooms.sort((a, b) {
               final aData = a.data() as Map<String, dynamic>;
               final bData = b.data() as Map<String, dynamic>;
+              final aPinned = Map<String, dynamic>.from(
+                    aData['pinnedBy'] ?? const <String, dynamic>{},
+                  )[_chatService.currentMessagingId] ==
+                  true;
+              final bPinned = Map<String, dynamic>.from(
+                    bData['pinnedBy'] ?? const <String, dynamic>{},
+                  )[_chatService.currentMessagingId] ==
+                  true;
+              if (aPinned != bPinned) return bPinned ? 1 : -1;
               final aTime = aData['lastMessageTime'] as Timestamp?;
               final bTime = bData['lastMessageTime'] as Timestamp?;
               return (bTime?.millisecondsSinceEpoch ?? 0)
@@ -413,8 +426,13 @@ class _ChatListTabState extends State<ChatListTab> {
             });
 
             final matchingRooms = rooms.where((room) {
-              if (!favoriteOnly) return true;
               final roomData = room.data() as Map<String, dynamic>;
+              final flags = Map<String, dynamic>.from(
+                roomData['archivedBy'] ?? const <String, dynamic>{},
+              );
+              final isArchived = flags[_chatService.currentMessagingId] == true;
+              if (archivedOnly != isArchived) return false;
+              if (!favoriteOnly) return true;
               final participants =
                   List<String>.from(roomData['participants'] ?? const []);
               final otherId = participants.firstWhere(
@@ -449,6 +467,7 @@ class _ChatListTabState extends State<ChatListTab> {
                 );
                 if (otherId.isEmpty) return const SizedBox.shrink();
                 return _buildDirectMessageTile(
+                  roomId: room.id,
                   otherId: otherId,
                   roomData: roomData,
                   unreadOnly: unreadOnly,
@@ -463,6 +482,7 @@ class _ChatListTabState extends State<ChatListTab> {
   }
 
   Widget _buildDirectMessageTile({
+    required String roomId,
     required String otherId,
     required Map<String, dynamic> roomData,
     required bool unreadOnly,
@@ -481,11 +501,18 @@ class _ChatListTabState extends State<ChatListTab> {
         return StreamBuilder<int>(
           stream: _chatService.getUnreadCountForChat(otherId),
           builder: (context, unreadSnapshot) {
-            final unreadCount = unreadSnapshot.data ?? 0;
+            final roomFlags = Map<String, dynamic>.from(
+              roomData['manualUnreadBy'] ?? const <String, dynamic>{},
+            );
+            final manuallyUnread =
+                roomFlags[_chatService.currentMessagingId] == true;
+            final unreadCount =
+                (unreadSnapshot.data ?? 0) + (manuallyUnread ? 1 : 0);
             if (unreadOnly && unreadCount == 0) {
               return const SizedBox.shrink();
             }
             return _directMessageTile(user, roomData,
+                roomId: roomId,
                 unreadCount: unreadCount, isFavorite: isFavorite);
           },
         );
@@ -496,6 +523,7 @@ class _ChatListTabState extends State<ChatListTab> {
   Widget _directMessageTile(
     Map<String, dynamic> user,
     Map<String, dynamic> roomData, {
+    required String roomId,
     int unreadCount = 0,
     required bool isFavorite,
   }) {
@@ -567,8 +595,123 @@ class _ChatListTabState extends State<ChatListTab> {
         ],
       ),
       onTap: () => _openDirectMessage(user),
-      onLongPress: () => _toggleFavorite(user, isFavorite),
+      onLongPress: () => _showChatActions(
+        roomId: roomId,
+        user: user,
+        roomData: roomData,
+        isPinned: (Map<String, dynamic>.from(
+                  roomData['pinnedBy'] ?? const <String, dynamic>{},
+                )[ _chatService.currentMessagingId] == true),
+        isArchived: (Map<String, dynamic>.from(
+                  roomData['archivedBy'] ?? const <String, dynamic>{},
+                )[ _chatService.currentMessagingId] == true),
+        isFavorite: isFavorite,
+      ),
     );
+  }
+
+  Future<void> _showChatActions({
+    required String roomId,
+    required Map<String, dynamic> user,
+    required Map<String, dynamic> roomData,
+    required bool isPinned,
+    required bool isArchived,
+    required bool isFavorite,
+  }) async {
+    final name = (user['fullName'] ?? user['displayName'] ?? 'This chat').toString();
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: RegentColors.dmSurface,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(isPinned ? Icons.push_pin : Icons.push_pin_outlined),
+              title: Text(isPinned ? 'Unpin chat' : 'Pin chat'),
+              onTap: () => Navigator.pop(context, 'pin'),
+            ),
+            ListTile(
+              leading: Icon(isArchived ? Icons.unarchive : Icons.archive_outlined),
+              title: Text(isArchived ? 'Unarchive chat' : 'Archive chat'),
+              onTap: () => Navigator.pop(context, 'archive'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.notifications_off_outlined),
+              title: const Text('Mute notifications'),
+              onTap: () => Navigator.pop(context, 'mute'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.mark_chat_unread_outlined),
+              title: const Text('Mark as unread'),
+              onTap: () => Navigator.pop(context, 'unread'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.star_border),
+              title: Text(isFavorite ? 'Remove from favorites' : 'Add to favorites'),
+              onTap: () => Navigator.pop(context, 'favorite'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.block, color: Colors.redAccent),
+              title: Text('Block $name', style: const TextStyle(color: Colors.redAccent)),
+              onTap: () => Navigator.pop(context, 'block'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    try {
+      switch (action) {
+        case 'pin':
+          await _chatService.updateChatRoomSettings(roomId, pinned: !isPinned);
+        case 'archive':
+          await _chatService.updateChatRoomSettings(roomId, archived: !isArchived);
+        case 'unread':
+          await _chatService.updateChatRoomSettings(roomId, markedUnread: true);
+        case 'favorite':
+          await _toggleFavorite(user, isFavorite);
+        case 'mute':
+          await _showMuteOptions(roomId);
+        case 'block':
+          await _blockService.blockUser(
+            blockedUserId: (user['uid'] ?? user['userId'] ?? '').toString(),
+            blockedUserName: name,
+            blockedUserPhotoUrl: user['photoUrl']?.toString(),
+          );
+      }
+      if (mounted) setState(() {});
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Chat action could not be completed: $error')),
+      );
+    }
+  }
+
+  Future<void> _showMuteOptions(String roomId) async {
+    final duration = await showModalBottomSheet<Duration?>(
+      context: context,
+      backgroundColor: RegentColors.dmSurface,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final entry in <MapEntry<String, Duration?>>[
+            const MapEntry('8 hours', Duration(hours: 8)),
+            const MapEntry('1 week', Duration(days: 7)),
+            const MapEntry('Always', null),
+          ])
+            ListTile(
+              title: Text(entry.key),
+              onTap: () => Navigator.pop(context, entry.value ?? Duration.zero),
+            ),
+        ],
+      ),
+    );
+    if (!mounted || duration == null) return;
+    final until = duration == Duration.zero
+        ? DateTime.now().add(const Duration(days: 3650))
+        : DateTime.now().add(duration);
+    await _chatService.updateChatRoomSettings(roomId, mutedUntil: until);
   }
 
   Future<void> _toggleFavorite(

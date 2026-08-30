@@ -38,7 +38,13 @@ class _MainScreenState extends State<MainScreen> {
   final _callService = CallService();
   final _statusService = StatusService();
 
-  final List<String> _filters = ['All', 'Unread', 'Favorites', 'Groups'];
+  final List<String> _filters = [
+    'All',
+    'Unread',
+    'Favorites',
+    'Groups',
+    'Archived',
+  ];
 
   @override
   void initState() {

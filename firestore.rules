@@ -192,6 +192,10 @@ service cloud.firestore {
           'lastSenderId',
           'lastSenderName',
           'typing',
+          'pinnedBy',
+          'archivedBy',
+          'mutedUntilBy',
+          'manualUnreadBy',
           'updatedAt'
         ]);
       allow delete: if false;

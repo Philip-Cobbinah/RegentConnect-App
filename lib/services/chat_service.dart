@@ -503,6 +503,34 @@ class ChatService {
     return favorite;
   }
 
+  Future<void> updateChatRoomSettings(
+    String roomId, {
+    bool? pinned,
+    bool? archived,
+    bool? markedUnread,
+    DateTime? mutedUntil,
+    bool clearMute = false,
+  }) async {
+    if (currentUserId.isEmpty || roomId.isEmpty) return;
+    final updates = <String, dynamic>{};
+    if (pinned != null) updates['pinnedBy.$currentMessagingId'] = pinned;
+    if (archived != null) updates['archivedBy.$currentMessagingId'] = archived;
+    if (markedUnread != null) {
+      updates['manualUnreadBy.$currentMessagingId'] = markedUnread;
+    }
+    if (mutedUntil != null) {
+      updates['mutedUntilBy.$currentMessagingId'] =
+          Timestamp.fromDate(mutedUntil);
+    } else if (clearMute) {
+      updates['mutedUntilBy.$currentMessagingId'] = FieldValue.delete();
+    }
+    if (updates.isEmpty) return;
+    await _firestore
+        .collection(AppConstants.chatsCollection)
+        .doc(roomId)
+        .update(updates);
+  }
+
   Future<UploadedMedia?> uploadMediaBytes(
     Uint8List bytes,
     String folder,
