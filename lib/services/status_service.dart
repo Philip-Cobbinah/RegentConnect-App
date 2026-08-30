@@ -43,6 +43,7 @@ class StatusService {
     String? mediaMimeType,
     String? mediaStoragePath,
     int? mediaSize,
+    List<String>? mentionedUserIds,
   }) async {
     if (currentUserId.isEmpty) return;
 
@@ -111,7 +112,21 @@ class StatusService {
       'expiresAt': Timestamp.fromDate(expiresAt),
     };
 
-    await _firestore.collection('statuses').doc(statusId).set(statusData);
+    final statusReference = _firestore.collection('statuses').doc(statusId);
+    final batch = _firestore.batch()..set(statusReference, statusData);
+    final validMentions = [...?mentionedUserIds]
+      ..removeWhere((userId) => userId == currentUserId);
+    for (final userId in validMentions.take(5)) {
+      batch.set(_firestore.collection('status_mentions').doc('${statusId}_$userId'), {
+        'statusId': statusId,
+        'recipientId': userId,
+        'statusOwnerId': currentUserId,
+        'statusOwnerName': statusData['userName'],
+        'createdAt': FieldValue.serverTimestamp(),
+        'message': 'You were mentioned in a status',
+      });
+    }
+    await batch.commit();
   }
 
   Stream<QuerySnapshot> getMyGroupsForStatus() {

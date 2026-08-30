@@ -16,6 +16,7 @@ class GroupModel {
   final bool requireApproval;
   final bool onlyAdminsEditInfo;
   final bool inviteLinkEnabled;
+  final bool everyoneMentionAdminsOnly;
   final List<String> pendingMembers;
   final String lastMessage;
 
@@ -44,6 +45,7 @@ class GroupModel {
     this.requireApproval = false,
     this.onlyAdminsEditInfo = true,
     this.inviteLinkEnabled = true,
+    this.everyoneMentionAdminsOnly = true,
     List<String>? pendingMembers,
     this.lastMessage = '',
   })  : admins = admins ?? [createdBy],
@@ -76,6 +78,7 @@ class GroupModel {
       'requireApproval': requireApproval,
       'onlyAdminsEditInfo': onlyAdminsEditInfo,
       'inviteLinkEnabled': inviteLinkEnabled,
+      'everyoneMentionAdminsOnly': everyoneMentionAdminsOnly,
       'pendingMembers': pendingMembers,
       'lastMessage': lastMessage,
     };
@@ -105,6 +108,7 @@ class GroupModel {
       requireApproval: map['requireApproval'] == true,
       onlyAdminsEditInfo: map['onlyAdminsEditInfo'] != false,
       inviteLinkEnabled: map['inviteLinkEnabled'] != false,
+      everyoneMentionAdminsOnly: map['everyoneMentionAdminsOnly'] != false,
       pendingMembers: List<String>.from(map['pendingMembers'] ?? const []),
       lastMessage: (map['lastMessage'] ?? '').toString(),
     );

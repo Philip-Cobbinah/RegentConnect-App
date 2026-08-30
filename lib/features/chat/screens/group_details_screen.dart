@@ -56,6 +56,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
     bool? membersCanPost,
     bool? requireApproval,
     bool? inviteLinkEnabled,
+    bool? everyoneMentionAdminsOnly,
   }) async {
     setState(() => _isUpdating = true);
     try {
@@ -64,6 +65,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
         membersCanPost: membersCanPost,
         requireApproval: requireApproval,
         inviteLinkEnabled: inviteLinkEnabled,
+        everyoneMentionAdminsOnly: everyoneMentionAdminsOnly,
       );
     } catch (error) {
       if (mounted) {
@@ -193,6 +195,18 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
               Card(
                 child: Column(
                   children: [
+                    SwitchListTile(
+                      secondary: const Icon(Icons.alternate_email, color: RegentColors.violet),
+                      title: const Text('Mention everyone: admins only'),
+                      subtitle: const Text('Turn off to let all members use @everyone.'),
+                      value: group.everyoneMentionAdminsOnly,
+                      onChanged: isAdmin && !_isUpdating
+                          ? (value) => _updateGovernance(
+                                group.id,
+                                everyoneMentionAdminsOnly: value,
+                              )
+                          : null,
+                    ),
                     SwitchListTile(
                       secondary: const Icon(
                         Icons.alternate_email,

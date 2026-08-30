@@ -29,6 +29,9 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isSending = false;
+  final Set<String> _mentionedUserIds = <String>{};
+  final Map<String, String> _mentionedUserNames = <String, String>{};
+  bool _mentionPickerOpen = false;
 
   @override
   void dispose() {
@@ -46,7 +49,11 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
       await _chatService.sendGroupMessage(
         groupId: group.id,
         message: message,
+        mentionedUserIds: _mentionedUserIds.toList(),
+        mentionEveryone: message.contains('@everyone'),
       );
+      _mentionedUserIds.clear();
+      _mentionedUserNames.clear();
       if (_scrollController.hasClients) {
         await _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
@@ -63,6 +70,63 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
       }
     } finally {
       if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  Future<void> _showMentionPicker(GroupModel group) async {
+    if (_mentionPickerOpen) return;
+    _mentionPickerOpen = true;
+    try {
+      final users = await Future.wait(group.members.map((id) async {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(id)
+            .get();
+        final data = snapshot.data() ?? <String, dynamic>{};
+        return <String, String>{
+          'id': id,
+          'name': (data['fullName'] ?? data['displayName'] ?? data['email'] ?? id)
+              .toString(),
+        };
+      }));
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: RegentColors.dmSurface,
+        builder: (sheetContext) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              if (group.isAdmin(_chatService.currentUserId) ||
+                  !group.everyoneMentionAdminsOnly)
+                ListTile(
+                  leading: const Icon(Icons.groups, color: RegentColors.lightViolet),
+                  title: const Text('@everyone', style: TextStyle(color: Colors.white)),
+                  subtitle: const Text('Mention every group member', style: TextStyle(color: Colors.white60)),
+                  onTap: () {
+                    _messageController.text = '${_messageController.text}@everyone ';
+                    Navigator.pop(sheetContext);
+                  },
+                ),
+              ...users.where((user) => user['id'] != _chatService.currentUserId).map(
+                    (user) => ListTile(
+                      leading: const Icon(Icons.person, color: RegentColors.lightViolet),
+                      title: Text(user['name']!, style: const TextStyle(color: Colors.white)),
+                      onTap: () {
+                        _mentionedUserIds.add(user['id']!);
+                        _mentionedUserNames[user['id']!] = user['name']!;
+                        _messageController.text =
+                            '${_messageController.text}@${user['name']} ';
+                        Navigator.pop(sheetContext);
+                      },
+                    ),
+                  ),
+            ],
+          ),
+        ),
+      );
+    } finally {
+      _mentionPickerOpen = false;
     }
   }
 
@@ -581,10 +645,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
               if (message.isNotEmpty)
                 Padding(
                   padding: EdgeInsets.only(top: mediaUrl.isNotEmpty ? 6 : 0),
-                  child: Text(
-                    message,
-                    style: const TextStyle(color: Colors.white, fontSize: 15),
-                  ),
+                  child: _buildMentionText(message, data),
                 ),
             ],
             const SizedBox(height: 3),
@@ -596,6 +657,29 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildMentionText(String message, Map<String, dynamic> data) {
+    final mentioned = List<String>.from(data['mentionedUserIds'] ?? const []);
+    final mentionEveryone = data['mentionEveryone'] == true;
+    final parts = RegExp(r'@[^ ]+').allMatches(message);
+    if (parts.isEmpty) {
+      return Text(message, style: const TextStyle(color: Colors.white, fontSize: 15));
+    }
+    final spans = <TextSpan>[];
+    var cursor = 0;
+    for (final match in parts) {
+      if (match.start > cursor) spans.add(TextSpan(text: message.substring(cursor, match.start)));
+      final token = match.group(0)!;
+      final isMention = mentionEveryone && token == '@everyone' || mentioned.isNotEmpty;
+      spans.add(TextSpan(
+        text: token,
+        style: TextStyle(color: isMention ? Colors.lightBlueAccent : Colors.white, fontWeight: isMention ? FontWeight.w700 : null),
+      ));
+      cursor = match.end;
+    }
+    if (cursor < message.length) spans.add(TextSpan(text: message.substring(cursor)));
+    return Text.rich(TextSpan(children: spans), style: const TextStyle(color: Colors.white, fontSize: 15));
   }
 
   Widget _buildGroupMediaPreview({
@@ -1030,7 +1114,15 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                         ),
                       ),
                       onSubmitted: (_) => _sendMessage(group),
+                      onChanged: (value) {
+                        if (value.endsWith('@')) _showMentionPicker(group);
+                      },
                     ),
+                  ),
+                  IconButton(
+                    tooltip: 'Mention a member',
+                    onPressed: _isSending ? null : () => _showMentionPicker(group),
+                    icon: const Icon(Icons.alternate_email, color: RegentColors.lightViolet),
                   ),
                   const SizedBox(width: 6),
                   _isSending

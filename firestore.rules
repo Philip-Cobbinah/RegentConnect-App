@@ -378,6 +378,28 @@ service cloud.firestore {
       }
     }
 
+    match /status_mentions/{mentionId} {
+      allow create: if signedIn() &&
+        request.resource.data.statusOwnerId == request.auth.uid &&
+        request.resource.data.recipientId is string;
+      allow read: if signedIn() &&
+        resource.data.recipientId == request.auth.uid;
+      allow update, delete: if signedIn() &&
+        resource.data.recipientId == request.auth.uid;
+    }
+
+    match /mention_notifications/{notificationId} {
+      allow create: if signedIn() &&
+        request.resource.data.senderId == request.auth.uid &&
+        request.resource.data.recipientId is string;
+      allow read: if signedIn() &&
+        resource.data.recipientId == request.auth.uid;
+      allow update: if signedIn() &&
+        resource.data.recipientId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if signedIn() && resource.data.recipientId == request.auth.uid;
+    }
+
     match /calls/{callId} {
       allow read: if signedIn() &&
         resource.data.participantIds is list &&

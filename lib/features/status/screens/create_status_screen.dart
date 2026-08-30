@@ -48,6 +48,8 @@ class _CreateStatusScreenState extends State<CreateStatusScreen> {
   String? _taggedGroupId;
   String? _taggedGroupName;
   String? _taggedGroupKind;
+  final Set<String> _mentionedUserIds = <String>{};
+  final Map<String, String> _mentionedUserNames = <String, String>{};
 
   final List<String> _backgroundColors = const [
     '#7C4DFF',
@@ -296,6 +298,7 @@ class _CreateStatusScreenState extends State<CreateStatusScreen> {
             widget.type == 'video' ? (_trimEndSeconds * 1000).round() : null,
         mediaDurationMs: widget.type == 'video' ? videoDuration : null,
         mediaMimeType: mediaUpload?.contentType ?? _mediaMimeType,
+        mentionedUserIds: _mentionedUserIds.toList(),
       );
 
       if (!mounted) return;
@@ -855,7 +858,9 @@ class _CreateStatusScreenState extends State<CreateStatusScreen> {
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(14, 9, 150, 9),
         color: Colors.black26,
-        child: _taggedGroupId == null
+        child: Row(
+          children: [
+            Expanded(child: _taggedGroupId == null
             ? OutlinedButton.icon(
                 onPressed: _showGroupTagPicker,
                 icon: const Icon(
@@ -915,7 +920,62 @@ class _CreateStatusScreenState extends State<CreateStatusScreen> {
                     ),
                   ],
                 ),
+              )),
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: 'Privately mention people',
+              onPressed: _showPrivateMentionPicker,
+              icon: Badge(
+                isLabelVisible: _mentionedUserIds.isNotEmpty,
+                label: Text('${_mentionedUserIds.length}'),
+                child: const Icon(Icons.person_add_alt_1, color: Colors.white),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showPrivateMentionPicker() async {
+    final remaining = 5 - _mentionedUserIds.length;
+    if (remaining <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You can privately mention up to 5 people.')),
+      );
+      return;
+    }
+    final snapshot = await FirebaseFirestore.instance.collection('users').limit(100).get();
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: RegentColors.dmSurface,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: snapshot.docs.where((doc) => doc.id != _statusService.currentUserId).map((doc) {
+            final data = doc.data();
+            final name = (data['fullName'] ?? data['displayName'] ?? data['email'] ?? doc.id).toString();
+            final selected = _mentionedUserIds.contains(doc.id);
+            return ListTile(
+              leading: const Icon(Icons.person, color: RegentColors.lightViolet),
+              title: Text(name, style: const TextStyle(color: Colors.white)),
+              trailing: selected ? const Icon(Icons.check, color: Colors.greenAccent) : null,
+              onTap: selected || _mentionedUserIds.length < 5 ? () {
+                setState(() {
+                  if (selected) {
+                    _mentionedUserIds.remove(doc.id);
+                    _mentionedUserNames.remove(doc.id);
+                  } else {
+                    _mentionedUserIds.add(doc.id);
+                    _mentionedUserNames[doc.id] = name;
+                  }
+                });
+                Navigator.pop(sheetContext);
+              } : null,
+            );
+          }).toList(),
+        ),
       ),
     );
   }

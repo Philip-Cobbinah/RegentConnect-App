@@ -938,6 +938,8 @@ class ChatService {
     int? mediaSize,
     bool isViewOnce = false,
     Map<String, dynamic>? metadata,
+    List<String>? mentionedUserIds,
+    bool mentionEveryone = false,
   }) async {
     if (currentUserId.isEmpty || (message.trim().isEmpty && mediaUrl == null)) {
       return;
@@ -958,6 +960,13 @@ class ChatService {
     }
     if (!group.canPost(currentUserId)) {
       throw Exception('Only channel admins can post here.');
+    }
+    final mentions = [...?mentionedUserIds]..removeWhere(
+        (userId) => !group.members.contains(userId) || userId == currentUserId);
+    if (mentionEveryone &&
+        group.everyoneMentionAdminsOnly &&
+        !group.isAdmin(currentUserId)) {
+      throw Exception('Only group admins can mention everyone.');
     }
 
     final senderDocument =
@@ -990,6 +999,8 @@ class ChatService {
       'isDeleted': false,
       'reactions': {},
       'metadata': metadata,
+      'mentionedUserIds': mentions,
+      'mentionEveryone': mentionEveryone,
     });
     batch.update(groupDocument.reference, {
       'lastMessage': message.trim().isNotEmpty ? message.trim() : 'Sent $type',
@@ -998,6 +1009,25 @@ class ChatService {
       'lastSenderId': currentUserId,
       'lastSenderName': senderName,
     });
+    final recipients = mentionEveryone ? group.members : mentions;
+    for (final recipientId in recipients.toSet()) {
+      if (recipientId == currentUserId) continue;
+      final notificationId =
+          '${groupId}_${messageReference.id}_$recipientId';
+      batch.set(_firestore.collection('mention_notifications').doc(notificationId), {
+        'recipientId': recipientId,
+        'groupId': groupId,
+        'messageId': messageReference.id,
+        'senderId': currentUserId,
+        'senderName': senderName,
+        'type': 'groupMention',
+        'message': mentionEveryone
+            ? 'You were mentioned in ${group.name}'
+            : 'You were mentioned by $senderName',
+        'createdAt': FieldValue.serverTimestamp(),
+        'read': false,
+      });
+    }
     await batch.commit();
   }
 
@@ -1114,6 +1144,7 @@ class ChatService {
     bool? requireApproval,
     bool? onlyAdminsEditInfo,
     bool? inviteLinkEnabled,
+    bool? everyoneMentionAdminsOnly,
   }) async {
     final updates = <String, dynamic>{};
     if (membersCanPost != null) updates['membersCanPost'] = membersCanPost;
@@ -1123,6 +1154,9 @@ class ChatService {
     }
     if (inviteLinkEnabled != null) {
       updates['inviteLinkEnabled'] = inviteLinkEnabled;
+    }
+    if (everyoneMentionAdminsOnly != null) {
+      updates['everyoneMentionAdminsOnly'] = everyoneMentionAdminsOnly;
     }
     if (updates.isEmpty) return;
     final reference = _firestore.collection('groups').doc(groupId);
