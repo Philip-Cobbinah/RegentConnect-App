@@ -207,6 +207,13 @@ class CallService {
     }
   }
 
+  Future<void> deleteCallFromHistory(String callId) async {
+    if (currentUserId.isEmpty || callId.isEmpty) return;
+    await _callRef(callId).update({
+      'hiddenFor': FieldValue.arrayUnion([currentUserId]),
+    });
+  }
+
   Future<void> acceptCall(String callId) async {
     final call = await _callRef(callId).get();
     final data = call.data();

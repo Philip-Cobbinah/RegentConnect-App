@@ -16,7 +16,15 @@ class CallsTab extends StatefulWidget {
 
 class _CallsTabState extends State<CallsTab> {
   final CallService _callService = CallService();
+  final TextEditingController _searchController = TextEditingController();
   String? _startingRecipientId;
+  String _search = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +51,15 @@ class _CallsTabState extends State<CallsTab> {
             return 0;
           });
 
+        final visibleCalls = calls.where((document) {
+          final data = document.data();
+          if (List<String>.from(data['hiddenFor'] ?? const []).contains(_callService.currentUserId)) {
+            return false;
+          }
+          final names = '${data['callerName'] ?? ''} ${data['receiverName'] ?? ''}'.toLowerCase();
+          return _search.isEmpty || names.contains(_search);
+        }).toList();
+
         if (calls.isEmpty) {
           return _emptyState(
             icon: Icons.call_outlined,
@@ -54,6 +71,18 @@ class _CallsTabState extends State<CallsTab> {
         return ListView(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 28),
           children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _search = value.trim().toLowerCase()),
+                decoration: const InputDecoration(
+                  hintText: 'Search call history',
+                  prefixIcon: Icon(Icons.search),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
             Card(
               margin: const EdgeInsets.only(bottom: 10),
               child: ListTile(
@@ -70,14 +99,14 @@ class _CallsTabState extends State<CallsTab> {
                 onTap: () => Navigator.pushNamed(context, '/users'),
               ),
             ),
-            for (final document in calls) _callTile(document.data()),
+            for (final document in visibleCalls) _callTile(document.id, document.data()),
           ],
         );
       },
     );
   }
 
-  Widget _callTile(Map<String, dynamic> call) {
+  Widget _callTile(String callId, Map<String, dynamic> call) {
     final isOutgoing = call['callerId'] == _callService.currentUserId;
     final recipientId =
         (isOutgoing ? call['receiverId'] : call['callerId'])?.toString() ?? '';
@@ -94,7 +123,9 @@ class _CallsTabState extends State<CallsTab> {
     final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
     final isStarting = _startingRecipientId == recipientId;
 
-    return Card(
+    return GestureDetector(
+      onLongPress: () => _callService.deleteCallFromHistory(callId),
+      child: Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -113,6 +144,7 @@ class _CallsTabState extends State<CallsTab> {
                   ),
                 ),
         ),
+        onTap: () => _showCallInfo(call),
         title: Text(
           name,
           maxLines: 1,
@@ -164,6 +196,18 @@ class _CallsTabState extends State<CallsTab> {
                           isVideo: isVideo,
                         ),
               ),
+      ),
+      ),
+    );
+  }
+
+  void _showCallInfo(Map<String, dynamic> call) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Call information'),
+        content: Text('Type: ${call['isVideo'] == true ? 'Video' : 'Audio'}\nStatus: ${call['status'] ?? 'Ended'}\nDuration: ${call['duration'] ?? 0} seconds'),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
       ),
     );
   }
