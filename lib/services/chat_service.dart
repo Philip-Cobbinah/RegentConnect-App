@@ -149,7 +149,11 @@ class ChatService {
       'viewedBy': <String>[],
       'timestamp': timestamp,
       'createdAt': timestamp,
-      if (disappearingHours != null && disappearingHours > 0)
+      if (isViewOnce)
+        'expiresAt': Timestamp.fromDate(
+          DateTime.now().add(const Duration(days: 14)),
+        )
+      else if (disappearingHours != null && disappearingHours > 0)
         'expiresAt': Timestamp.fromDate(
           DateTime.now().add(Duration(hours: disappearingHours)),
         ),

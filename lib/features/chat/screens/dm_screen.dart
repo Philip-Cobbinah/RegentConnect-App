@@ -146,6 +146,7 @@ class _DMScreenState extends State<DMScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   bool _isSending = false;
+  bool _viewOnceTextEnabled = false;
   String _messageSearchQuery = '';
   bool _isStartingCall = false;
   bool _isChatReady = false;
@@ -2026,7 +2027,7 @@ class _DMScreenState extends State<DMScreen> {
                         ),
                       ),
                     ),
-                  _buildMessageContent(data, type, messageId, isMe),
+                  _buildViewOnceTextOrContent(data, type, messageId, isMe),
                   const SizedBox(height: 4),
                   // Time and status
                   Row(
@@ -2119,6 +2120,45 @@ class _DMScreenState extends State<DMScreen> {
           ],
         ),
       ),
+      ),
+    );
+  }
+
+  Widget _buildViewOnceTextOrContent(
+    Map<String, dynamic> data,
+    String type,
+    String messageId,
+    bool isMe,
+  ) {
+    if (type != 'text' || data['isViewOnce'] != true) {
+      return _buildMessageContent(data, type, messageId, isMe);
+    }
+    final viewedBy = List<String>.from(data['viewedBy'] ?? const []);
+    final viewed = viewedBy.contains(_chatService.currentMessagingId);
+    if (isMe) {
+      return Text(
+        viewed ? 'Opened' : 'View once message',
+        style: const TextStyle(color: Colors.white70, fontStyle: FontStyle.italic),
+      );
+    }
+    if (viewed) {
+      return const Text(
+        'Opened',
+        style: TextStyle(color: Colors.white70, fontStyle: FontStyle.italic),
+      );
+    }
+    return InkWell(
+      onTap: () => _chatService.markMessageAsViewed(
+        otherUserId: widget.recipientId,
+        messageId: messageId,
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.looks_one, color: Colors.white, size: 26),
+          SizedBox(width: 8),
+          Text('Tap to view once', style: TextStyle(color: Colors.white)),
+        ],
       ),
     );
   }
@@ -2760,11 +2800,13 @@ class _DMScreenState extends State<DMScreen> {
               Navigator.pop(context);
               _setReplyTo(data, messageId: messageId);
             }),
-            _buildOptionTile(Icons.forward, 'Forward', () {
+            if (data['isViewOnce'] != true)
+              _buildOptionTile(Icons.forward, 'Forward', () {
               Navigator.pop(context);
               _forwardMessage(data);
             }),
-            _buildOptionTile(Icons.copy, 'Copy', () {
+            if (data['isViewOnce'] != true)
+              _buildOptionTile(Icons.copy, 'Copy', () {
               Navigator.pop(context);
               _copyMessage(data['message'] ?? '');
             }),
@@ -2780,7 +2822,8 @@ class _DMScreenState extends State<DMScreen> {
                 Navigator.pop(context);
                 _showEditMessageDialog(messageId, data['message']?.toString() ?? '');
               }),
-            _buildOptionTile(
+            if (data['isViewOnce'] != true)
+              _buildOptionTile(
               data['starredBy']?.contains(_chatService.currentMessagingId) ==
                       true
                   ? Icons.star
@@ -2798,7 +2841,8 @@ class _DMScreenState extends State<DMScreen> {
               Navigator.pop(context);
               _deleteMessage(messageId);
             }, isDestructive: true),
-            _buildOptionTile(Icons.more_horiz, 'More', () {
+            if (data['isViewOnce'] != true)
+              _buildOptionTile(Icons.more_horiz, 'More', () {
               Navigator.pop(context);
               _showMoreOptions(context, data, isMe, messageId);
             }),
@@ -3630,6 +3674,24 @@ class _DMScreenState extends State<DMScreen> {
                       ),
                     ),
                     IconButton(
+                      tooltip: _viewOnceTextEnabled
+                          ? 'View once is on'
+                          : 'Send as view once',
+                      visualDensity: VisualDensity.compact,
+                      icon: Icon(
+                        Icons.looks_one,
+                        color: _viewOnceTextEnabled
+                            ? Colors.lightGreenAccent
+                            : RegentColors.lightViolet,
+                      ),
+                      onPressed: _messageController.text.trim().isEmpty
+                          ? null
+                          : () => setState(
+                                () => _viewOnceTextEnabled =
+                                    !_viewOnceTextEnabled,
+                              ),
+                    ),
+                    IconButton(
                       tooltip: 'Stickers',
                       visualDensity: VisualDensity.compact,
                       icon: const Icon(
@@ -3668,7 +3730,9 @@ class _DMScreenState extends State<DMScreen> {
                           ),
                           onPressed: _messageController.text.trim().isEmpty
                               ? _startRecording
-                              : _sendMessageWithReply,
+                              : () => _sendMessageWithReply(
+                                    isViewOnce: _viewOnceTextEnabled,
+                                  ),
                         ),
                       ),
                   ],
@@ -3733,7 +3797,10 @@ class _DMScreenState extends State<DMScreen> {
         isViewOnce: isViewOnce,
       );
       if (mounted) {
-        setState(() => _replyingTo = null);
+        setState(() {
+          _replyingTo = null;
+          _viewOnceTextEnabled = false;
+        });
       }
       _scrollToBottom();
     } catch (error) {
