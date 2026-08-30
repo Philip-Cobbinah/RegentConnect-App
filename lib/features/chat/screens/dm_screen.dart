@@ -3505,6 +3505,9 @@ class _DMScreenState extends State<DMScreen> {
                         child: TextField(
                           controller: _messageController,
                           cursorColor: RegentColors.darkViolet,
+                          minLines: 1,
+                          maxLines: 5,
+                          keyboardType: TextInputType.multiline,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 15,
@@ -3593,28 +3596,23 @@ class _DMScreenState extends State<DMScreen> {
     }
   }
 
-  void _openStatusReply(Map<String, dynamic> metadata) {
+  Future<void> _openStatusReply(Map<String, dynamic> metadata) async {
     final statusId = metadata['statusId']?.toString();
     if (statusId == null || statusId.isEmpty) return;
+    final status = await StatusService().getStatus(statusId);
+    if (!mounted) return;
+    if (status == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This status is no longer available.')),
+      );
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ViewStatusScreen(
           isOwner: false,
-          statuses: [
-            {
-              'statusId': statusId,
-              'userId': metadata['statusPosterId'] ?? widget.recipientId,
-              'userName': metadata['statusPosterName'] ?? widget.recipientName,
-              'type': metadata['statusType'] ?? 'text',
-              'text': metadata['statusText'],
-              'mediaUrl': metadata['statusMediaUrl'],
-              'backgroundColor': '#7C4DFF',
-              'expiresAt': Timestamp.fromDate(
-                DateTime.now().add(const Duration(minutes: 1)),
-              ),
-            },
-          ],
+          statuses: [status],
         ),
       ),
     );

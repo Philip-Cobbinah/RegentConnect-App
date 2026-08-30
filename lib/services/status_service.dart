@@ -273,6 +273,17 @@ class StatusService {
     return List<Map<String, dynamic>>.from(data['views'] ?? []);
   }
 
+  Future<Map<String, dynamic>?> getStatus(String statusId) async {
+    if (statusId.isEmpty) return null;
+    final snapshot =
+        await _firestore.collection('statuses').doc(statusId).get();
+    if (!snapshot.exists) return null;
+    return {
+      ...(snapshot.data() ?? <String, dynamic>{}),
+      'statusId': snapshot.id,
+    };
+  }
+
   Future<bool> toggleLikeStatus(String statusId) async {
     if (currentUserId.isEmpty) return false;
     final reference = _firestore.collection('statuses').doc(statusId);
