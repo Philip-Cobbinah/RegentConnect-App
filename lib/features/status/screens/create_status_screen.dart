@@ -26,7 +26,7 @@ class CreateStatusScreen extends StatefulWidget {
 }
 
 class _CreateStatusScreenState extends State<CreateStatusScreen> {
-  static const double _maxVideoSeconds = 30;
+  static const double _maxVideoSeconds = 60;
 
   final StatusService _statusService = StatusService();
   final TextEditingController _textController = TextEditingController();
@@ -682,7 +682,7 @@ class _CreateStatusScreenState extends State<CreateStatusScreen> {
                           ),
                         ),
                         const Text(
-                          'Max 30s',
+                            'Max 60s',
                           style: TextStyle(
                             color: RegentColors.lightViolet,
                             fontSize: 11,

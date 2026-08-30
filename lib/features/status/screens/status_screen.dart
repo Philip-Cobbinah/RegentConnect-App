@@ -497,7 +497,7 @@ class _StatusScreenState extends State<StatusScreen> {
   Future<void> _recordVideo() async {
     final video = await ImagePicker().pickVideo(
       source: ImageSource.camera,
-      maxDuration: const Duration(seconds: 30),
+      maxDuration: const Duration(seconds: 60),
     );
     if (video != null && mounted) {
       _createMediaStatus(video, 'video');
