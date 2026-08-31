@@ -74,17 +74,9 @@ service cloud.firestore {
     function participatesIn(chatData) {
       return signedIn() &&
         (
-          (
-            chatData.participants is list &&
-            (
-              request.auth.uid in chatData.participants ||
-              messagingIdentity() in chatData.participants
-            )
-          ) ||
-          (
-            chatData.participantAuthIds is list &&
-            request.auth.uid in chatData.participantAuthIds
-          )
+          request.auth.uid in chatData.get('participants', []) ||
+          messagingIdentity() in chatData.get('participants', []) ||
+          request.auth.uid in chatData.get('participantAuthIds', [])
         );
     }
 
@@ -170,7 +162,12 @@ service cloud.firestore {
     }
 
     match /chats/{chatId} {
-      allow read: if participatesIn(resource.data);
+      allow read: if signedIn() &&
+        (
+          request.auth.uid in resource.data.get('participants', []) ||
+          messagingIdentity() in resource.data.get('participants', []) ||
+          request.auth.uid in resource.data.get('participantAuthIds', [])
+        );
       allow create: if participatesIn(request.resource.data) &&
         request.resource.data.participants is list &&
         request.resource.data.participants.size() == 2 &&

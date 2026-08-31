@@ -82,6 +82,7 @@ service firebase.storage {
       return request.resource == null ||
         (
           request.resource.size <= maxBytes &&
+          request.resource.contentType is string &&
           request.resource.contentType.matches(
             'image/.*|video/.*|audio/.*|application/pdf|application/msword|application/vnd\\..*|text/plain|application/octet-stream'
           )
@@ -92,6 +93,7 @@ service firebase.storage {
       return request.resource == null ||
         (
           request.resource.size <= maxBytes &&
+          request.resource.contentType is string &&
           request.resource.contentType.matches('image/.*')
         );
     }
