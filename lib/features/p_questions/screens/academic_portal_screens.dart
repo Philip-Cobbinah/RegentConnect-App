@@ -1252,13 +1252,28 @@ class _PastQuestionResultCard extends StatelessWidget {
   }
 }
 
-class AcademicCalendarScreen extends StatelessWidget {
+enum _CalendarTrack {
+  continuing,
+  octoberBatch,
+  februaryBatch,
+  weekendSchool,
+  crush,
+}
+
+class AcademicCalendarScreen extends StatefulWidget {
   const AcademicCalendarScreen({super.key});
 
   @override
+  State<AcademicCalendarScreen> createState() => _AcademicCalendarScreenState();
+}
+
+class _AcademicCalendarScreenState extends State<AcademicCalendarScreen> {
+  _CalendarTrack _selectedTrack = _CalendarTrack.continuing;
+
+  @override
   Widget build(BuildContext context) {
-    const academicYear = '2026/2027 Academic Year';
-    final events = _academicTimelineEvents();
+    final track = _calendarTrackDetails[_selectedTrack]!;
+    final events = _academicTimelineEvents(_selectedTrack);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Academic Calendar')),
@@ -1277,19 +1292,33 @@ class AcademicCalendarScreen extends StatelessWidget {
             elevation: 0,
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.event_available_rounded,
-                      color: RegentColors.violet),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      academicYear,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
-                      ),
+                  const Text('Choose your academic calendar',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<_CalendarTrack>(
+                    value: _selectedTrack,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Calendar track',
+                      prefixIcon: Icon(Icons.event_available_rounded),
                     ),
+                    items: _calendarTrackDetails.entries
+                        .map((entry) => DropdownMenuItem(
+                              value: entry.key,
+                              child: Text(entry.value.title),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) setState(() => _selectedTrack = value);
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '${track.period} - ${track.subtitle}',
+                    style: TextStyle(color: Colors.grey.shade700),
                   ),
                 ],
               ),
@@ -1312,7 +1341,7 @@ class AcademicCalendarScreen extends StatelessWidget {
                     children: [
                       Icon(Icons.schedule_rounded, color: RegentColors.violet),
                       SizedBox(width: 10),
-                      Text('First-semester teaching timetable',
+                      Text('Published teaching timetable',
                           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
                     ],
                   ),
@@ -1344,6 +1373,11 @@ class AcademicCalendarScreen extends StatelessWidget {
               icon: event.icon,
               accent: event.accent,
             ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Compiled from the official 2026/2027 academic calendars supplied by Regent University. Dates are shown for planning and remain subject to official notices.',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ],
       ),
@@ -2802,7 +2836,100 @@ class _AcademicCalendarEvent {
   final Color accent;
 }
 
-List<_AcademicCalendarEvent> _academicTimelineEvents() {
+class _CalendarTrackDetails {
+  const _CalendarTrackDetails({required this.title, required this.subtitle, required this.period});
+
+  final String title;
+  final String subtitle;
+  final String period;
+}
+
+const _calendarTrackDetails = <_CalendarTrack, _CalendarTrackDetails>{
+  _CalendarTrack.continuing: _CalendarTrackDetails(
+    title: 'Continuing students',
+    subtitle: 'Main academic year calendar for continuing and top-up students.',
+    period: '2026/2027 Academic Year',
+  ),
+  _CalendarTrack.octoberBatch: _CalendarTrackDetails(
+    title: 'Level 100 October batch',
+    subtitle: 'Level 100 October intake: 14 weeks including revision and examinations.',
+    period: 'September - December 2026',
+  ),
+  _CalendarTrack.februaryBatch: _CalendarTrackDetails(
+    title: 'Level 100 February batch',
+    subtitle: 'Level 100 February intake: 13 weeks per semester.',
+    period: 'February - August 2027',
+  ),
+  _CalendarTrack.weekendSchool: _CalendarTrackDetails(
+    title: 'Weekend school',
+    subtitle: 'Weekend school trimester calendar for the 2026/2027 academic year.',
+    period: 'October 2026 - October 2027',
+  ),
+  _CalendarTrack.crush: _CalendarTrackDetails(
+    title: 'CRUSH Level 100',
+    subtitle: 'Accelerated calendar with six teaching weeks and two examination weeks.',
+    period: 'April - August 2027',
+  ),
+};
+
+_AcademicCalendarEvent _calendarEvent(String title, String subtitle, String dateRange, IconData icon, Color accent) =>
+    _AcademicCalendarEvent(title: title, subtitle: subtitle, dateRange: dateRange, icon: icon, accent: accent);
+
+List<_AcademicCalendarEvent> _academicTimelineEvents(_CalendarTrack track) {
+  switch (track) {
+    case _CalendarTrack.continuing:
+      return [
+        _calendarEvent('Course registration', 'Register and confirm first-semester courses.', '24 - 28 August 2026', Icons.assignment_turned_in_rounded, RegentColors.violet),
+        _calendarEvent('Lectures begin', 'First-semester lectures commence for continuing students.', 'Monday, 31 August 2026', Icons.menu_book_rounded, RegentColors.green),
+        _calendarEvent('Mid-semester examinations', 'First-semester assessment window.', '19 - 23 October 2026', Icons.fact_check_rounded, Colors.orange),
+        _calendarEvent('End of lectures', 'First-semester teaching concludes.', 'Friday, 27 November 2026', Icons.school_rounded, RegentColors.green),
+        _calendarEvent('Revision and appraisal week', 'Online revision and appraisal activities.', '30 November - 4 December 2026', Icons.fact_check_rounded, Colors.orange),
+        _calendarEvent('First-semester examinations', 'Continuing students sit first-semester examinations.', '7 - 18 December 2026', Icons.edit_note_rounded, Colors.red),
+        _calendarEvent('Second semester reopens', 'Course registration and lectures commence.', 'Monday, 4 January 2027', Icons.restart_alt_rounded, RegentColors.violet),
+        _calendarEvent('Second-semester examinations', 'Second-semester examination window.', '19 - 29 April 2027', Icons.edit_note_rounded, Colors.red),
+      ];
+    case _CalendarTrack.octoberBatch:
+      return [
+        _calendarEvent('Orientation and registration', 'Orientation and registration for fresh Level 100 October students.', '8 - 10 September 2026', Icons.how_to_reg_rounded, RegentColors.violet),
+        _calendarEvent('Lectures begin', 'Level 100 October batch lectures commence.', 'Monday, 14 September 2026', Icons.menu_book_rounded, RegentColors.green),
+        _calendarEvent('Mid-semester examinations', 'Mid-semester examination window.', '26 - 30 October 2026', Icons.fact_check_rounded, Colors.orange),
+        _calendarEvent('End of lectures', 'Teaching concludes for the October batch.', 'Friday, 27 November 2026', Icons.school_rounded, RegentColors.green),
+        _calendarEvent('Revision and appraisal week', 'Online revision and appraisal activities.', '30 November - 4 December 2026', Icons.fact_check_rounded, Colors.orange),
+        _calendarEvent('First-semester examinations', 'Level 100 October examination window.', '7 - 18 December 2026', Icons.edit_note_rounded, Colors.red),
+      ];
+    case _CalendarTrack.februaryBatch:
+      return [
+        _calendarEvent('Orientation', 'Orientation for the Level 100 February batch.', '1 - 3 February 2027', Icons.groups_rounded, RegentColors.violet),
+        _calendarEvent('Registration and lectures begin', 'Register courses and begin first-semester lectures.', '8 - 12 February 2027', Icons.assignment_turned_in_rounded, RegentColors.green),
+        _calendarEvent('Mid-semester examinations', 'First-semester assessment window.', '15 - 19 March 2027', Icons.fact_check_rounded, Colors.orange),
+        _calendarEvent('Revision and appraisal week', 'Online revision and appraisal activities.', '20 - 24 April 2027', Icons.fact_check_rounded, Colors.orange),
+        _calendarEvent('First-semester examinations', 'End-of-semester examination window.', '26 April - 7 May 2027', Icons.edit_note_rounded, Colors.red),
+        _calendarEvent('Second semester reopens', 'Second-semester registration and lectures commence.', 'Monday, 17 May 2027', Icons.restart_alt_rounded, RegentColors.violet),
+        _calendarEvent('Summer examinations', 'Second-semester summer examination window.', '2 - 13 August 2027', Icons.edit_note_rounded, Colors.red),
+      ];
+    case _CalendarTrack.weekendSchool:
+      return [
+        _calendarEvent('Orientation and reopening', 'Weekend school orientation, reopening and course registration.', '2 - 10 October 2026', Icons.how_to_reg_rounded, RegentColors.violet),
+        _calendarEvent('Mid-trimester examinations', 'First-trimester assessment window.', '20 - 21 November 2026', Icons.fact_check_rounded, Colors.orange),
+        _calendarEvent('End of lectures', 'First-trimester teaching concludes.', 'Saturday, 19 December 2026', Icons.school_rounded, RegentColors.green),
+        _calendarEvent('Revision and appraisal week', 'Weekend revision and appraisal activities.', '8 - 9 January 2027', Icons.fact_check_rounded, Colors.orange),
+        _calendarEvent('First-trimester examinations', 'First-trimester examination window.', '15 - 23 January 2027', Icons.edit_note_rounded, Colors.red),
+        _calendarEvent('Second trimester', 'Registration, teaching, revision and examinations.', '12 February - 15 May 2027', Icons.calendar_month_rounded, RegentColors.violet),
+        _calendarEvent('Third trimester', 'Registration, teaching, revision and examinations.', '4 June - 4 September 2027', Icons.calendar_month_rounded, RegentColors.violet),
+      ];
+    case _CalendarTrack.crush:
+      return [
+        _calendarEvent('CRUSH first semester opens', 'Reopening and registration for Level 100 CRUSH students.', 'Monday, 26 April 2027', Icons.assignment_turned_in_rounded, RegentColors.violet),
+        _calendarEvent('First-semester lectures', 'Six-week accelerated teaching period.', '3 May - 11 June 2027', Icons.menu_book_rounded, RegentColors.green),
+        _calendarEvent('First-semester examinations', 'Two-week CRUSH examination window.', '14 - 25 June 2027', Icons.edit_note_rounded, Colors.red),
+        _calendarEvent('CRUSH second semester opens', 'Reopening and registration for the next accelerated semester.', 'Monday, 28 June 2027', Icons.restart_alt_rounded, RegentColors.violet),
+        _calendarEvent('Second-semester lectures', 'Six-week accelerated teaching period.', '28 June - 13 August 2027', Icons.menu_book_rounded, RegentColors.green),
+        _calendarEvent('Second-semester examinations', 'Two-week CRUSH examination window.', '16 - 27 August 2027', Icons.edit_note_rounded, Colors.red),
+      ];
+  }
+}
+
+List<_AcademicCalendarEvent> _legacyAcademicTimelineEvents() {
   return [
     _AcademicCalendarEvent(
       title: 'First semester teaching begins',
