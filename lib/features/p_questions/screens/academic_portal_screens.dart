@@ -1365,6 +1365,10 @@ class _AcademicCalendarScreenState extends State<AcademicCalendarScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          _buildFeeNoticeCard(),
+          const SizedBox(height: 16),
+          _buildExamTimetableCard(),
+          const SizedBox(height: 16),
           ...events.map(
             (event) => _TimelineCard(
               title: event.title,
@@ -1379,6 +1383,100 @@ class _AcademicCalendarScreenState extends State<AcademicCalendarScreen> {
             'Compiled from the official 2026/2027 academic calendars supplied by Regent University. Dates are shown for planning and remain subject to official notices.',
             style: TextStyle(fontSize: 12, color: Colors.grey),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeeNoticeCard() {
+    return Card(
+      elevation: 0,
+      color: Colors.orange.withOpacity(0.08),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: Colors.orange.withOpacity(0.22)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.campaign_rounded, color: Colors.orange),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text('Important notice: regular students',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            const Text('Pay at least 60% of your 2026/2027 fees by Friday, 11 September 2026.'),
+            const SizedBox(height: 6),
+            const Text('Late payment attracts a GH¢500 penalty.'),
+            const SizedBox(height: 12),
+            _calendarDetailRow(Icons.account_balance_rounded, 'Ecobank Dansoman', 'Regent University College of Science & Technology'),
+            _calendarDetailRow(Icons.numbers_rounded, 'Account number', '1441000852770'),
+            _calendarDetailRow(Icons.support_agent_rounded, 'Fees enquiries', '+233 (0) 535197392 | finance@regent.edu.gh'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExamTimetableCard() {
+    const sessions = <String>[
+      'Friday, 17 July 2026: 5:30-6:30 PM and 7:00-8:00 PM',
+      'Saturday, 18 July 2026: 8:30-9:30 AM, 10:00-11:00 AM, 12:00-1:00 PM and 1:30-2:30 PM',
+    ];
+    const courses = <String>[
+      'Level 100: Circuit Theory, Digital Computer Fundamentals, Accounting and Finance, Critical Reading and Writing, Information Technology II, C++ Programming and Introductory Statistics.',
+      'Level 200: Communication Systems, Instruments and Measurements, Data Structures, Application Programming with C#, Economics II, Electrical Machines II, Data Communication and Networks II.',
+      'Level 300: Entrepreneurship Management, Team Project and Research Seminar, Taxation, Cognitive Psychology, Engineering Project Management, Strategic Leadership and Financial Management II.',
+      'Level 400: Mechatronics and Robotics, Spreadsheet Modelling, Industrial Calibrations, Strategic Leadership, Financial Management II, Management Science and Mathematical Modelling.',
+    ];
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: ExpansionTile(
+        leading: const Icon(Icons.fact_check_rounded, color: RegentColors.violet),
+        title: const Text('Weekend mid-trimester exam timetable', style: TextStyle(fontWeight: FontWeight.w800)),
+        subtitle: const Text('Third trimester - 17 and 18 July 2026'),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          ...sessions.map((session) => _calendarDetailRow(Icons.schedule_rounded, 'Session', session)),
+          const SizedBox(height: 6),
+          ...courses.map((course) => Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.menu_book_rounded, size: 18, color: RegentColors.violet),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(course)),
+                  ],
+                ),
+              )),
+          const SizedBox(height: 10),
+          const Text(
+            'Exam requirements: pay at least 60% of trimester fees, arrive 30 minutes early, bring a valid student ID and stationery. Phones and electronic devices are prohibited in the examination hall.',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _calendarDetailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: RegentColors.violet),
+          const SizedBox(width: 8),
+          Expanded(child: Text('$label: $value')),
         ],
       ),
     );
