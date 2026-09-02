@@ -845,6 +845,8 @@ How can I assist you today?''',
                           hintText: 'E.g., "Solve this problem"',
                           hintStyle:
                               TextStyle(fontSize: 12, color: Colors.white38),
+                          filled: true,
+                          fillColor: Color(0x2E7C4DFF),
                           border: InputBorder.none,
                           counterStyle: TextStyle(color: Colors.white54, fontSize: 10),
                           contentPadding:
@@ -946,6 +948,8 @@ How can I assist you today?''',
                   decoration: const InputDecoration(
                     hintText: 'Ask Regent AI anything...',
                     hintStyle: TextStyle(color: Colors.white38),
+                    filled: true,
+                    fillColor: Color(0x2E7C4DFF),
                     border: InputBorder.none,
                     counterStyle: TextStyle(color: Colors.white54, fontSize: 10),
                     contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
