@@ -1367,6 +1367,8 @@ class _AcademicCalendarScreenState extends State<AcademicCalendarScreen> {
           const SizedBox(height: 16),
           _buildFeeNoticeCard(),
           const SizedBox(height: 16),
+          _buildTuitionFeeCard(),
+          const SizedBox(height: 16),
           _buildExamTimetableCard(),
           const SizedBox(height: 16),
           ...events.map(
@@ -1463,6 +1465,42 @@ class _AcademicCalendarScreenState extends State<AcademicCalendarScreen> {
             'Exam requirements: pay at least 60% of trimester fees, arrive 30 minutes early, bring a valid student ID and stationery. Phones and electronic devices are prohibited in the examination hall.',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTuitionFeeCard() {
+    const feeRows = <String>[
+      'Ghanaian - SBLL: Regular GHS 3,049 | Weekend GHS 2,044.90',
+      'Ghanaian - FAS: Regular GHS 3,049 | Weekend GHS 2,044.90',
+      'Ghanaian - FECAS: Regular GHS 3,335 | Weekend GHS 2,234.46',
+      'International - SBLL: Regular GHS 7,532.25 | Weekend GHS 5,082',
+      'International - FAS: Regular GHS 7,532.25 | Weekend GHS 5,082',
+      'International - FECAS: Regular GHS 8,246.98 | Weekend GHS 5,443.16',
+    ];
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: ExpansionTile(
+        leading: const Icon(Icons.payments_rounded, color: RegentColors.violet),
+        title: const Text('2026/2027 tuition fees', style: TextStyle(fontWeight: FontWeight.w800)),
+        subtitle: const Text('Regular and Weekend school fees'),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          const Text('Published tuition fees by student category and school.', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          ...feeRows.map((row) => Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.circle, size: 8, color: RegentColors.violet),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(row)),
+                  ],
+                ),
+              )),
         ],
       ),
     );
@@ -2981,14 +3019,17 @@ List<_AcademicCalendarEvent> _academicTimelineEvents(_CalendarTrack track) {
         _calendarEvent('Course registration', 'Register and confirm first-semester courses.', '24 - 28 August 2026', Icons.assignment_turned_in_rounded, RegentColors.violet),
         _calendarEvent('Top-up orientation', 'Orientation for fresh top-up students.', '25 - 28 August 2026', Icons.groups_rounded, RegentColors.violet),
         _calendarEvent('Lectures begin', 'First-semester lectures commence for continuing students.', 'Monday, 31 August 2026', Icons.menu_book_rounded, RegentColors.green),
+        _calendarEvent('Resit registration', 'Register for resit and supplementary examinations.', '7 - 10 September 2026', Icons.assignment_turned_in_rounded, Colors.orange),
         _calendarEvent('Resit and supplementary examinations', 'Resit and supplementary examination window.', '14 - 18 September 2026', Icons.fact_check_rounded, Colors.orange),
         _calendarEvent('Departmental peer review week', 'Academic peer review activities.', '21 - 25 September 2026', Icons.groups_rounded, Colors.blue),
+        _calendarEvent('Academic Board approval', 'Approval of final-year examination results.', 'Thursday, 1 October 2026', Icons.verified_rounded, RegentColors.violet),
         _calendarEvent('Mid-semester examinations', 'First-semester assessment window.', '19 - 23 October 2026', Icons.fact_check_rounded, Colors.orange),
         _calendarEvent('End of lectures', 'First-semester teaching concludes.', 'Friday, 27 November 2026', Icons.school_rounded, RegentColors.green),
         _calendarEvent('Revision and appraisal week', 'Online revision and appraisal activities.', '30 November - 4 December 2026', Icons.fact_check_rounded, Colors.orange),
         _calendarEvent('First-semester examinations', 'Continuing students sit first-semester examinations.', '7 - 18 December 2026', Icons.edit_note_rounded, Colors.red),
         _calendarEvent('Second semester reopens', 'Course registration and lectures commence.', 'Monday, 4 January 2027', Icons.restart_alt_rounded, RegentColors.violet),
         _calendarEvent('Second-semester lectures', 'Continuing-student lectures begin.', 'Monday, 11 January 2027', Icons.menu_book_rounded, RegentColors.green),
+        _calendarEvent('First-semester results released', 'First-semester results are released to continuing students.', 'Monday, 15 February 2027', Icons.assessment_rounded, RegentColors.violet),
         _calendarEvent('Mid-semester examinations', 'Second-semester assessment window.', '1 - 5 March 2027', Icons.fact_check_rounded, Colors.orange),
         _calendarEvent('Second-semester examinations', 'Second-semester examination window.', '19 - 29 April 2027', Icons.edit_note_rounded, Colors.red),
       ];

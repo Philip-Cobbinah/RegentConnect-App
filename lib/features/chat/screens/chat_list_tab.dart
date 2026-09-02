@@ -675,6 +675,7 @@ class _ChatListTabState extends State<ChatListTab> {
           await _showMuteOptions(roomId);
         case 'block':
           await _blockService.blockUser(
+            currentUserId: _chatService.currentUserId,
             blockedUserId: (user['uid'] ?? user['userId'] ?? '').toString(),
             blockedUserName: name,
             blockedUserPhotoUrl: user['photoUrl']?.toString(),

@@ -11,6 +11,7 @@ import '../../../services/chat_service.dart';
 import 'community_chat_screen.dart';
 import 'official_account_profile_screen.dart';
 import 'dm_screen.dart';
+import '../../p_questions/screens/academic_portal_screens.dart';
 
 /// WhatsApp-style search across the signed-in user's conversations, group
 /// memberships, official offices, directory contacts and recent message text.
@@ -94,6 +95,7 @@ class RegentChatSearchDelegate extends SearchDelegate<void> {
         onOpenChat: (contact) => _openChat(context, contact),
         onOpenGroup: (group) => _openGroup(context, group),
         onOpenMessage: (message) => _openMessage(context, message),
+        onOpenAcademic: (_) => _openAcademic(context),
       );
 
   @override
@@ -102,6 +104,7 @@ class RegentChatSearchDelegate extends SearchDelegate<void> {
         onOpenChat: (contact) => _openChat(context, contact),
         onOpenGroup: (group) => _openGroup(context, group),
         onOpenMessage: (message) => _openMessage(context, message),
+        onOpenAcademic: (_) => _openAcademic(context),
       );
 
   void _openChat(BuildContext context, _SearchContact contact) {
@@ -150,6 +153,14 @@ class RegentChatSearchDelegate extends SearchDelegate<void> {
       ),
     );
   }
+
+  void _openAcademic(BuildContext context) {
+    final navigator = Navigator.of(context);
+    close(context, null);
+    navigator.push(
+      MaterialPageRoute(builder: (_) => const AcademicCalendarScreen()),
+    );
+  }
 }
 
 class _SearchResults extends StatefulWidget {
@@ -158,12 +169,14 @@ class _SearchResults extends StatefulWidget {
     required this.onOpenChat,
     required this.onOpenGroup,
     required this.onOpenMessage,
+    required this.onOpenAcademic,
   });
 
   final String query;
   final ValueChanged<_SearchContact> onOpenChat;
   final ValueChanged<GroupModel> onOpenGroup;
   final ValueChanged<_SearchMessage> onOpenMessage;
+  final ValueChanged<_SearchAcademicResource> onOpenAcademic;
 
   @override
   State<_SearchResults> createState() => _SearchResultsState();
@@ -314,15 +327,32 @@ class _SearchResultsState extends State<_SearchResults> {
               .compareTo(a.timestamp?.millisecondsSinceEpoch ?? 0),
         );
 
+      final academicResources = _academicResources
+          .where((resource) => _matches(needle, [
+                resource.title,
+                resource.subtitle,
+                resource.keywords,
+              ]))
+          .toList();
+
       return _SearchData(
         contacts: contacts.take(20).toList(),
         chats: chatMatches.take(20).toList(),
         groups: groups.take(20).toList(),
         messages: messages.take(30).toList(),
+        academicResources: academicResources,
       );
     } catch (error) {
       debugPrint('Chat search failed: $error');
-      return const _SearchData();
+      return _SearchData(
+        academicResources: _academicResources
+            .where((resource) => _matches(needle, [
+                  resource.title,
+                  resource.subtitle,
+                  resource.keywords,
+                ]))
+            .toList(),
+      );
     }
   }
 
@@ -440,6 +470,10 @@ class _SearchResultsState extends State<_SearchResults> {
         if (data.messages.isNotEmpty) ...[
           _header(Icons.message_outlined, 'Messages', data.messages.length),
           ...data.messages.map(_messageTile),
+        ],
+        if (data.academicResources.isNotEmpty) ...[
+          _header(Icons.school_outlined, 'Academic resources', data.academicResources.length),
+          ...data.academicResources.map(_academicTile),
         ],
       ],
     );
@@ -564,7 +598,18 @@ class _SearchResultsState extends State<_SearchResults> {
           overflow: TextOverflow.ellipsis,
         ),
         trailing: Text(_timeLabel(message.timestamp)),
-        onTap: () => widget.onOpenMessage(message),
+      onTap: () => widget.onOpenMessage(message),
+    );
+
+  Widget _academicTile(_SearchAcademicResource resource) => ListTile(
+        leading: const CircleAvatar(
+          backgroundColor: RegentColors.violet,
+          child: Icon(Icons.school_outlined, color: Colors.white),
+        ),
+        title: Text(resource.title),
+        subtitle: Text(resource.subtitle),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => widget.onOpenAcademic(resource),
       );
 
   String _timeLabel(Timestamp? timestamp) {
@@ -611,16 +656,49 @@ class _SearchData {
     this.chats = const [],
     this.groups = const [],
     this.messages = const [],
+    this.academicResources = const [],
   });
 
   final List<_SearchContact> contacts;
   final List<_SearchChat> chats;
   final List<GroupModel> groups;
   final List<_SearchMessage> messages;
+  final List<_SearchAcademicResource> academicResources;
 
   bool get isEmpty =>
-      contacts.isEmpty && chats.isEmpty && groups.isEmpty && messages.isEmpty;
+      contacts.isEmpty && chats.isEmpty && groups.isEmpty && messages.isEmpty &&
+      academicResources.isEmpty;
 }
+
+class _SearchAcademicResource {
+  const _SearchAcademicResource({
+    required this.title,
+    required this.subtitle,
+    required this.keywords,
+  });
+
+  final String title;
+  final String subtitle;
+  final String keywords;
+}
+
+const _academicResources = <_SearchAcademicResource>[
+  _SearchAcademicResource(
+    title: '2026/2027 tuition fees',
+    subtitle: 'Ghanaian and international fees for Regular and Weekend schools',
+    keywords: 'tuition fee fees payment school regular weekend SBLL FAS FECAS Ghanaian international',
+  ),
+  _SearchAcademicResource(
+    title: 'Academic calendar and important dates',
+    subtitle: 'Registration, lectures, examinations, holidays and official notices',
+    keywords: 'calendar important dates registration lectures examinations exams continuing October February weekend CRUSH',
+  ),
+  _SearchAcademicResource(
+    title: 'Weekend mid-trimester exam timetable',
+    subtitle: 'Third-trimester examination sessions, courses and requirements',
+    keywords: 'exam timetable mid trimester third trimester weekend courses level lecturer July 2026',
+  ),
+];
 
 class _SearchContact {
   const _SearchContact({
