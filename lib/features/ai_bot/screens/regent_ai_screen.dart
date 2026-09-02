@@ -21,6 +21,7 @@ class RegentAIScreen extends StatefulWidget {
 }
 
 class _RegentAIScreenState extends State<RegentAIScreen> {
+  static const int _maxPromptLength = 65536;
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   final List<AIChatMessage> _messages = [];
@@ -33,6 +34,7 @@ class _RegentAIScreenState extends State<RegentAIScreen> {
 
   bool _isLoading = false;
   bool _isLoadingHistory = true;
+  bool _limitWarningShown = false;
 
   // Image preview
   Uint8List? _pendingImageData;
@@ -121,6 +123,10 @@ How can I assist you today?''',
   Future<void> _sendMessage() async {
     final message = _messageController.text.trim();
     if (message.isEmpty || _isLoading) return;
+    if (message.length > _maxPromptLength) {
+      _showPromptLimitWarning();
+      return;
+    }
 
     setState(() {
       _messages.add(AIChatMessage(
@@ -217,6 +223,10 @@ How can I assist you today?''',
     if (_pendingImageData == null || _isLoading) return;
 
     final userMessage = _messageController.text.trim();
+    if (userMessage.length > _maxPromptLength) {
+      _showPromptLimitWarning();
+      return;
+    }
     final imageData = _pendingImageData!;
 
     setState(() {
@@ -259,6 +269,16 @@ How can I assist you today?''',
 
     await _saveMessages();
     _scrollToBottom();
+  }
+
+  void _showPromptLimitWarning() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Your message is too long. Regent AI allows up to 65,536 characters.'),
+        duration: Duration(seconds: 3),
+      ),
+    );
   }
 
   // ============ AUDIO RECORDING METHODS ============
@@ -807,20 +827,26 @@ How can I assist you today?''',
                     const SizedBox(height: 4),
                     Container(
                       decoration: BoxDecoration(
-                        color: RegentColors.dmCard,
-                        borderRadius: BorderRadius.circular(12),
+                        color: RegentColors.violet.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: RegentColors.lightViolet.withOpacity(0.75),
+                        ),
                       ),
                       child: TextField(
                         controller: _messageController,
-                        maxLines: 2,
+                        maxLines: 4,
                         minLines: 1,
+                        maxLength: _maxPromptLength,
                         style:
                             const TextStyle(color: Colors.white, fontSize: 14),
+                        keyboardType: TextInputType.multiline,
                         decoration: const InputDecoration(
                           hintText: 'E.g., "Solve this problem"',
                           hintStyle:
                               TextStyle(fontSize: 12, color: Colors.white38),
                           border: InputBorder.none,
+                          counterStyle: TextStyle(color: Colors.white54, fontSize: 10),
                           contentPadding:
                               EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
@@ -876,21 +902,37 @@ How can I assist you today?''',
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                    color: RegentColors.dmCard,
-                    borderRadius: BorderRadius.circular(24)),
+                    color: RegentColors.violet.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(25),
+                    border: Border.all(
+                      color: RegentColors.lightViolet.withOpacity(0.85),
+                      width: 1.4,
+                    )),
                 child: TextField(
                   controller: _messageController,
-                  maxLines: 4,
+                  maxLines: 6,
                   minLines: 1,
+                  maxLength: _maxPromptLength,
                   style: const TextStyle(color: Colors.white),
                   textCapitalization: TextCapitalization.sentences,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
+                  onChanged: (value) {
+                    if (value.length < _maxPromptLength) {
+                      _limitWarningShown = false;
+                    } else if (!_limitWarningShown) {
+                      _limitWarningShown = true;
+                      _showPromptLimitWarning();
+                    }
+                    setState(() {});
+                  },
                   onSubmitted: (_) => _sendMessage(),
                   decoration: const InputDecoration(
                     hintText: 'Ask Regent AI anything...',
                     hintStyle: TextStyle(color: Colors.white38),
                     border: InputBorder.none,
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    counterStyle: TextStyle(color: Colors.white54, fontSize: 10),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   ),
                 ),
               ),
