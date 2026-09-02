@@ -2879,31 +2879,48 @@ List<_AcademicCalendarEvent> _academicTimelineEvents(_CalendarTrack track) {
   switch (track) {
     case _CalendarTrack.continuing:
       return [
+        _calendarEvent('Reopening date', 'Main academic year reopens for continuing students.', 'Monday, 24 August 2026', Icons.restart_alt_rounded, RegentColors.violet),
         _calendarEvent('Course registration', 'Register and confirm first-semester courses.', '24 - 28 August 2026', Icons.assignment_turned_in_rounded, RegentColors.violet),
+        _calendarEvent('Top-up orientation', 'Orientation for fresh top-up students.', '25 - 28 August 2026', Icons.groups_rounded, RegentColors.violet),
         _calendarEvent('Lectures begin', 'First-semester lectures commence for continuing students.', 'Monday, 31 August 2026', Icons.menu_book_rounded, RegentColors.green),
+        _calendarEvent('Resit and supplementary examinations', 'Resit and supplementary examination window.', '14 - 18 September 2026', Icons.fact_check_rounded, Colors.orange),
+        _calendarEvent('Departmental peer review week', 'Academic peer review activities.', '21 - 25 September 2026', Icons.groups_rounded, Colors.blue),
         _calendarEvent('Mid-semester examinations', 'First-semester assessment window.', '19 - 23 October 2026', Icons.fact_check_rounded, Colors.orange),
         _calendarEvent('End of lectures', 'First-semester teaching concludes.', 'Friday, 27 November 2026', Icons.school_rounded, RegentColors.green),
         _calendarEvent('Revision and appraisal week', 'Online revision and appraisal activities.', '30 November - 4 December 2026', Icons.fact_check_rounded, Colors.orange),
         _calendarEvent('First-semester examinations', 'Continuing students sit first-semester examinations.', '7 - 18 December 2026', Icons.edit_note_rounded, Colors.red),
         _calendarEvent('Second semester reopens', 'Course registration and lectures commence.', 'Monday, 4 January 2027', Icons.restart_alt_rounded, RegentColors.violet),
+        _calendarEvent('Second-semester lectures', 'Continuing-student lectures begin.', 'Monday, 11 January 2027', Icons.menu_book_rounded, RegentColors.green),
+        _calendarEvent('Mid-semester examinations', 'Second-semester assessment window.', '1 - 5 March 2027', Icons.fact_check_rounded, Colors.orange),
         _calendarEvent('Second-semester examinations', 'Second-semester examination window.', '19 - 29 April 2027', Icons.edit_note_rounded, Colors.red),
       ];
     case _CalendarTrack.octoberBatch:
       return [
+        _calendarEvent('Mature applicants programme', 'Classes, examinations and orientation for mature applicants.', '31 July - 5 September 2026', Icons.groups_rounded, Colors.blue),
+        _calendarEvent('Top-up orientation', 'Orientation for fresh top-up students; lectures begin 31 August.', '25 - 28 August 2026', Icons.groups_rounded, RegentColors.violet),
         _calendarEvent('Orientation and registration', 'Orientation and registration for fresh Level 100 October students.', '8 - 10 September 2026', Icons.how_to_reg_rounded, RegentColors.violet),
         _calendarEvent('Lectures begin', 'Level 100 October batch lectures commence.', 'Monday, 14 September 2026', Icons.menu_book_rounded, RegentColors.green),
+        _calendarEvent('Joint Admission Board meeting', 'Joint Admission Board meeting for the October group.', 'Thursday, 29 October 2026', Icons.groups_rounded, Colors.blue),
         _calendarEvent('Mid-semester examinations', 'Mid-semester examination window.', '26 - 30 October 2026', Icons.fact_check_rounded, Colors.orange),
         _calendarEvent('End of lectures', 'Teaching concludes for the October batch.', 'Friday, 27 November 2026', Icons.school_rounded, RegentColors.green),
         _calendarEvent('Revision and appraisal week', 'Online revision and appraisal activities.', '30 November - 4 December 2026', Icons.fact_check_rounded, Colors.orange),
+        _calendarEvent('Farmer\'s Day holiday', 'Public holiday.', 'Friday, 4 December 2026', Icons.event_busy_rounded, Colors.blue),
+        _calendarEvent('Graduation ceremony', 'Official graduation ceremony.', 'Saturday, 12 December 2026', Icons.celebration_rounded, RegentColors.violet),
         _calendarEvent('First-semester examinations', 'Level 100 October examination window.', '7 - 18 December 2026', Icons.edit_note_rounded, Colors.red),
       ];
     case _CalendarTrack.februaryBatch:
       return [
         _calendarEvent('Orientation', 'Orientation for the Level 100 February batch.', '1 - 3 February 2027', Icons.groups_rounded, RegentColors.violet),
         _calendarEvent('Registration and lectures begin', 'Register courses and begin first-semester lectures.', '8 - 12 February 2027', Icons.assignment_turned_in_rounded, RegentColors.green),
-        _calendarEvent('Mid-semester examinations', 'First-semester assessment window.', '15 - 19 March 2027', Icons.fact_check_rounded, Colors.orange),
+        _calendarEvent('Lectures', 'First-semester lectures continue through the teaching period.', '8 February - 23 April 2027', Icons.menu_book_rounded, RegentColors.green),
+        _calendarEvent('Matriculation', 'Matriculation for all fresh students.', 'Friday, 12 March 2027', Icons.celebration_rounded, RegentColors.violet),
+        _calendarEvent('Parliamentary week', 'University parliamentary week.', '15 - 21 March 2027', Icons.groups_rounded, Colors.blue),
+        _calendarEvent('Mid-semester examinations', 'First-semester assessment window.', '22 - 25 March 2027', Icons.fact_check_rounded, Colors.orange),
+        _calendarEvent('Easter break', 'Public holiday break.', '26 - 29 March 2027', Icons.event_busy_rounded, Colors.blue),
         _calendarEvent('Revision and appraisal week', 'Online revision and appraisal activities.', '20 - 24 April 2027', Icons.fact_check_rounded, Colors.orange),
         _calendarEvent('First-semester examinations', 'End-of-semester examination window.', '26 April - 7 May 2027', Icons.edit_note_rounded, Colors.red),
+        _calendarEvent('May Day holiday', 'Public holiday.', 'Saturday, 1 May 2027', Icons.event_busy_rounded, Colors.blue),
+        _calendarEvent('Vacation', 'Break following first-semester examinations.', '7 - 14 May 2027', Icons.beach_access_rounded, Colors.blue),
         _calendarEvent('Second semester reopens', 'Second-semester registration and lectures commence.', 'Monday, 17 May 2027', Icons.restart_alt_rounded, RegentColors.violet),
         _calendarEvent('Summer examinations', 'Second-semester summer examination window.', '2 - 13 August 2027', Icons.edit_note_rounded, Colors.red),
       ];
@@ -2915,15 +2932,19 @@ List<_AcademicCalendarEvent> _academicTimelineEvents(_CalendarTrack track) {
         _calendarEvent('Revision and appraisal week', 'Weekend revision and appraisal activities.', '8 - 9 January 2027', Icons.fact_check_rounded, Colors.orange),
         _calendarEvent('First-trimester examinations', 'First-trimester examination window.', '15 - 23 January 2027', Icons.edit_note_rounded, Colors.red),
         _calendarEvent('Second trimester', 'Registration, teaching, revision and examinations.', '12 February - 15 May 2027', Icons.calendar_month_rounded, RegentColors.violet),
+        _calendarEvent('Second-trimester mid examinations', 'Second-trimester mid-trimester examinations.', '2 - 3 April 2027', Icons.fact_check_rounded, Colors.orange),
         _calendarEvent('Third trimester', 'Registration, teaching, revision and examinations.', '4 June - 4 September 2027', Icons.calendar_month_rounded, RegentColors.violet),
+        _calendarEvent('Third-trimester mid examinations', 'Third-trimester mid-trimester examinations.', '16 - 17 July 2027', Icons.fact_check_rounded, Colors.orange),
       ];
     case _CalendarTrack.crush:
       return [
         _calendarEvent('CRUSH first semester opens', 'Reopening and registration for Level 100 CRUSH students.', 'Monday, 26 April 2027', Icons.assignment_turned_in_rounded, RegentColors.violet),
         _calendarEvent('First-semester lectures', 'Six-week accelerated teaching period.', '3 May - 11 June 2027', Icons.menu_book_rounded, RegentColors.green),
+        _calendarEvent('Question moderation deadline', 'Submission deadline for examination questions and marking schemes.', 'Friday, 4 June 2027', Icons.fact_check_rounded, Colors.orange),
         _calendarEvent('First-semester examinations', 'Two-week CRUSH examination window.', '14 - 25 June 2027', Icons.edit_note_rounded, Colors.red),
         _calendarEvent('CRUSH second semester opens', 'Reopening and registration for the next accelerated semester.', 'Monday, 28 June 2027', Icons.restart_alt_rounded, RegentColors.violet),
         _calendarEvent('Second-semester lectures', 'Six-week accelerated teaching period.', '28 June - 13 August 2027', Icons.menu_book_rounded, RegentColors.green),
+        _calendarEvent('Question moderation deadline', 'Submission deadline for examination questions and marking schemes.', 'Friday, 6 August 2027', Icons.fact_check_rounded, Colors.orange),
         _calendarEvent('Second-semester examinations', 'Two-week CRUSH examination window.', '16 - 27 August 2027', Icons.edit_note_rounded, Colors.red),
       ];
   }
