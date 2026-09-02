@@ -178,7 +178,7 @@ class ChatService {
     batch.set(
       chatReference,
       {
-        'lastMessage': message.trim(),
+        'lastMessage': isViewOnce ? 'View once message' : message.trim(),
         'lastMessageType': type,
         'lastMessageTime': timestamp,
         'updatedAt': timestamp,

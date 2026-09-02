@@ -3792,23 +3792,24 @@ class _DMScreenState extends State<DMScreen> {
                 )
               : Row(
                   children: [
-                    IconButton(
-                      tooltip: 'More attachments',
-                      visualDensity: VisualDensity.compact,
-                      icon: const Icon(
-                        Icons.add_circle,
-                        color: RegentColors.lightViolet,
-                      ),
-                      onPressed: _showAttachmentOptions,
-                    ),
-                    IconButton(
-                      tooltip: 'Camera',
-                      visualDensity: VisualDensity.compact,
-                      icon: const Icon(
-                        Icons.camera_alt,
-                        color: RegentColors.lightViolet,
-                      ),
-                      onPressed: () => _pickImage(ImageSource.camera),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'More attachments',
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.add_circle,
+                              color: RegentColors.lightViolet),
+                          onPressed: _showAttachmentOptions,
+                        ),
+                        IconButton(
+                          tooltip: 'Camera',
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.camera_alt,
+                              color: RegentColors.lightViolet),
+                          onPressed: () => _pickImage(ImageSource.camera),
+                        ),
+                      ],
                     ),
                     Expanded(
                       child: Container(
@@ -3847,61 +3848,59 @@ class _DMScreenState extends State<DMScreen> {
                         ),
                       ),
                     ),
-                    IconButton(
-                      tooltip: 'Send view once',
-                      visualDensity: VisualDensity.compact,
-                      icon: Icon(
-                        Icons.looks_one,
-                        color: _viewOnceTextEnabled
-                            ? Colors.lightGreenAccent
-                            : RegentColors.lightViolet,
-                      ),
-                      onPressed: _showViewOnceMenu,
-                    ),
-                    IconButton(
-                      tooltip: 'Stickers',
-                      visualDensity: VisualDensity.compact,
-                      icon: const Icon(
-                        Icons.emoji_emotions_outlined,
-                        color: RegentColors.lightViolet,
-                      ),
-                      onPressed: _showStickerPicker,
-                    ),
-                    if (_isSending)
-                      const Padding(
-                        padding: EdgeInsets.all(10),
-                        child: SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            color: RegentColors.lightViolet,
-                            strokeWidth: 2,
-                          ),
-                        ),
-                      )
-                    else
-                      GestureDetector(
-                        onLongPress: _messageController.text.trim().isEmpty
-                            ? null
-                            : () => _sendViewOnceText(),
-                        child: IconButton(
-                          tooltip: _messageController.text.trim().isEmpty
-                              ? 'Record audio'
-                              : 'Send message (hold for view once)',
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'Send view once',
                           visualDensity: VisualDensity.compact,
-                          icon: Icon(
-                            _messageController.text.trim().isEmpty
-                                ? Icons.mic
-                                : Icons.send,
-                            color: RegentColors.lightViolet,
-                          ),
-                          onPressed: _messageController.text.trim().isEmpty
-                              ? _startRecording
-                              : () => _sendMessageWithReply(
-                                    isViewOnce: _viewOnceTextEnabled,
-                                  ),
+                          icon: Icon(Icons.looks_one,
+                              color: _viewOnceTextEnabled
+                                  ? Colors.lightGreenAccent
+                                  : RegentColors.lightViolet),
+                          onPressed: _showViewOnceMenu,
                         ),
-                      ),
+                        IconButton(
+                          tooltip: 'Stickers',
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.emoji_emotions_outlined,
+                              color: RegentColors.lightViolet),
+                          onPressed: _showStickerPicker,
+                        ),
+                        if (_isSending)
+                          const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: RegentColors.lightViolet,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        else
+                          GestureDetector(
+                            onLongPress: _messageController.text.trim().isEmpty
+                                ? null
+                                : () => _sendViewOnceText(),
+                            child: IconButton(
+                              tooltip: _messageController.text.trim().isEmpty
+                                  ? 'Record audio'
+                                  : 'Send message',
+                              visualDensity: VisualDensity.compact,
+                              icon: Icon(
+                                _messageController.text.trim().isEmpty
+                                    ? Icons.mic
+                                    : Icons.send,
+                                color: RegentColors.lightViolet,
+                              ),
+                              onPressed: _messageController.text.trim().isEmpty
+                                  ? _startRecording
+                                  : () => _sendMessageWithReply(
+                                        isViewOnce: _viewOnceTextEnabled,
+                                      ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
         ),
