@@ -148,6 +148,7 @@ class _DMScreenState extends State<DMScreen> {
 
   bool _isSending = false;
   bool _viewOnceTextEnabled = false;
+  bool _viewOnceAudioEnabled = false;
   String _messageSearchQuery = '';
   bool _isStartingCall = false;
   bool _isChatReady = false;
@@ -694,6 +695,7 @@ class _DMScreenState extends State<DMScreen> {
       setState(() {
         _isRecording = false;
         _recordingDuration = 0;
+        _viewOnceAudioEnabled = false;
       });
     }
   }
@@ -701,6 +703,7 @@ class _DMScreenState extends State<DMScreen> {
   Future<void> _sendRecording() async {
     _recordingTimer?.cancel();
     final duration = _recordingDuration;
+    final isViewOnce = _viewOnceAudioEnabled;
     final path = await _audioRecorder.stop();
     if (mounted) {
       setState(() {
@@ -723,7 +726,9 @@ class _DMScreenState extends State<DMScreen> {
         originalName: 'voice_message.m4a',
         contentType: 'audio/mp4',
         audioDuration: duration,
+        isViewOnce: isViewOnce,
       );
+      if (mounted) setState(() => _viewOnceAudioEnabled = false);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -784,6 +789,10 @@ class _DMScreenState extends State<DMScreen> {
                   _attachmentOption(Icons.photo_library, 'Photos', () {
                     Navigator.pop(context);
                     _pickImage(ImageSource.gallery);
+                  }),
+                  _attachmentOption(Icons.video_library, 'Video', () {
+                    Navigator.pop(context);
+                    _pickVideo();
                   }),
                   _attachmentOption(Icons.description, 'Document', () {
                     Navigator.pop(context);
@@ -1262,6 +1271,65 @@ class _DMScreenState extends State<DMScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showViewOnceMenu() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: RegentColors.dmSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              leading: Icon(Icons.looks_one, color: RegentColors.lightViolet),
+              title: Text('Send view once'),
+              subtitle: Text('The recipient can open it only one time.'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: const Text('Text message'),
+              onTap: () => Navigator.pop(sheetContext, 'text'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Photo'),
+              onTap: () => Navigator.pop(sheetContext, 'photo'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.video_library_outlined),
+              title: const Text('Video'),
+              onTap: () => Navigator.pop(sheetContext, 'video'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.mic_none_rounded),
+              title: const Text('Voice message'),
+              onTap: () => Navigator.pop(sheetContext, 'audio'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'text') {
+      if (_messageController.text.trim().isNotEmpty) {
+        setState(() => _viewOnceTextEnabled = true);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Type a message first.')),
+        );
+      }
+    } else if (choice == 'photo') {
+      await _pickImage(ImageSource.gallery);
+    } else if (choice == 'video') {
+      await _pickVideo();
+    } else if (choice == 'audio') {
+      setState(() => _viewOnceAudioEnabled = true);
+      await _startRecording();
+    }
   }
 
   Future<void> _createSticker() async {
@@ -2149,10 +2217,7 @@ class _DMScreenState extends State<DMScreen> {
       );
     }
     return InkWell(
-      onTap: () => _chatService.markMessageAsViewed(
-        otherUserId: widget.recipientId,
-        messageId: messageId,
-      ),
+      onTap: () => _openViewOnceTextDialog(data['message']?.toString() ?? '', messageId),
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -2162,6 +2227,59 @@ class _DMScreenState extends State<DMScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _openViewOnceTextDialog(String message, String messageId) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('View once message'),
+        content: SelectableText(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+    if (mounted) {
+      await _chatService.markMessageAsViewed(
+        otherUserId: widget.recipientId,
+        messageId: messageId,
+      );
+    }
+  }
+
+  Future<void> _openViewOnceAudioDialog(
+    Map<String, dynamic> data,
+    String messageId,
+  ) async {
+    final url = data['mediaUrl']?.toString();
+    if (url == null || url.isEmpty) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('View once voice message'),
+        content: IconButton.filled(
+          iconSize: 34,
+          onPressed: () => _audioPlayer.play(UrlSource(url)),
+          icon: const Icon(Icons.play_arrow),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+    if (mounted) {
+      await _chatService.markMessageAsViewed(
+        otherUserId: widget.recipientId,
+        messageId: messageId,
+      );
+    }
   }
 
   Widget _buildMessageContent(
@@ -2276,6 +2394,19 @@ class _DMScreenState extends State<DMScreen> {
     }
 
     if (type == 'audio') {
+      final isViewOnce = data['isViewOnce'] == true;
+      final viewedBy = List<String>.from(data['viewedBy'] ?? const []);
+      final hasBeenViewed = viewedBy.contains(_chatService.currentMessagingId);
+      if (isViewOnce && !isMe && !hasBeenViewed) {
+        return InkWell(
+          onTap: () => _openViewOnceAudioDialog(data, messageId),
+          borderRadius: BorderRadius.circular(12),
+          child: _buildViewOnceLockedPreview('voice message'),
+        );
+      }
+      if (isViewOnce && !isMe && hasBeenViewed) {
+        return _buildViewOnceConsumedPreview('Voice message');
+      }
       return InkWell(
         onTap: () {
           final url = data['mediaUrl']?.toString();
@@ -2487,6 +2618,20 @@ class _DMScreenState extends State<DMScreen> {
 
     if (mediaUrl.isEmpty) {
       return const SizedBox.shrink();
+    }
+
+    if (isViewOnce && !isMe && !hasBeenViewed) {
+      return InkWell(
+        onTap: () => _openMediaViewer(
+          mediaUrl: mediaUrl,
+          mediaType: type,
+          title: title,
+          messageId: messageId,
+          shouldMarkViewed: true,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        child: _buildViewOnceLockedPreview(label),
+      );
     }
 
     if (isViewOnce && !isMe && hasBeenViewed) {
@@ -2850,6 +2995,34 @@ class _DMScreenState extends State<DMScreen> {
             const SizedBox(height: 20),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildViewOnceLockedPreview(String label) {
+    return Container(
+      width: 220,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.22),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: RegentColors.lightViolet.withOpacity(0.55)),
+      ),
+      child: Row(
+        children: [
+          const CircleAvatar(
+            radius: 20,
+            backgroundColor: RegentColors.violet,
+            child: Icon(Icons.looks_one, color: Colors.white),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Tap to open $label once',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3675,9 +3848,7 @@ class _DMScreenState extends State<DMScreen> {
                       ),
                     ),
                     IconButton(
-                      tooltip: _viewOnceTextEnabled
-                          ? 'View once is on'
-                          : 'Send as view once',
+                      tooltip: 'Send view once',
                       visualDensity: VisualDensity.compact,
                       icon: Icon(
                         Icons.looks_one,
@@ -3685,12 +3856,7 @@ class _DMScreenState extends State<DMScreen> {
                             ? Colors.lightGreenAccent
                             : RegentColors.lightViolet,
                       ),
-                      onPressed: _messageController.text.trim().isEmpty
-                          ? null
-                          : () => setState(
-                                () => _viewOnceTextEnabled =
-                                    !_viewOnceTextEnabled,
-                              ),
+                      onPressed: _showViewOnceMenu,
                     ),
                     IconButton(
                       tooltip: 'Stickers',
