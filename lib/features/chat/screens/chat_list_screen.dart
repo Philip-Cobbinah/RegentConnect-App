@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants.dart';
 import '../../../core/theme.dart';
+import '../../../core/official_accounts.dart';
 import '../../../services/chat_service.dart';
 import '../../../services/status_service.dart';
 import 'dm_screen.dart';
@@ -60,18 +61,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
       final usersSnapshot =
           await FirebaseFirestore.instance.collection('users').get();
 
-      final userResults = usersSnapshot.docs
-          .where((doc) {
-            final data = doc.data();
-            final name = (data['fullName'] ?? '').toString().toLowerCase();
-            final email = (data['email'] ?? '').toString().toLowerCase();
-            return name.contains(query.toLowerCase()) ||
-                email.contains(query.toLowerCase());
-          })
-          .where((doc) => doc.id != _chatService.currentUserId)
-          .map((doc) => {
-                ...doc.data(),
-                'userId': doc.id,
+      final directory = OfficialAccounts.mergeDirectory(usersSnapshot.docs.map((doc) => {
+        ...doc.data(),
+        'uid': doc.id,
+        'authUid': doc.id,
+        'documentId': doc.id,
+      }));
+      final userResults = OfficialAccounts.search(directory, query)
+          .where((user) => (user['chatIdentity'] ?? user['uid']).toString() != _chatService.currentMessagingId)
+          .map((user) => {
+                ...user,
+                'userId': user['chatIdentity'] ?? user['uid'],
                 'type': 'user',
               })
           .toList();

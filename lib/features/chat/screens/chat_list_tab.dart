@@ -208,7 +208,7 @@ class _ChatListTabState extends State<ChatListTab> {
                 const CircleAvatar(
                   radius: 22,
                   backgroundColor: RegentColors.violet,
-                  child: Icon(Icons.account_balance, color: Colors.white),
+                  child: Icon(_officialIconForKey(account.iconKey), color: Colors.white),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -810,5 +810,17 @@ class _ChatListTabState extends State<ChatListTab> {
         ),
       ),
     );
+  }
+}
+
+IconData _officialIconForKey(String key) {
+  switch (key) {
+    case 'restaurant': return Icons.restaurant;
+    case 'menu_book': return Icons.menu_book;
+    case 'badge': return Icons.badge;
+    case 'payments': return Icons.payments;
+    case 'school': return Icons.school;
+    case 'groups': return Icons.groups;
+    default: return Icons.support_agent;
   }
 }

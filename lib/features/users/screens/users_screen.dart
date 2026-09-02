@@ -270,7 +270,7 @@ class _UsersScreenState extends State<UsersScreen> {
                   : null,
               child: photo == null || photo.isEmpty
                   ? Icon(
-                      isOfficial ? Icons.account_balance : Icons.person,
+                      isOfficial ? _officialIconForUser(user) : Icons.person,
                       color: isOfficial ? Colors.white : Colors.grey.shade700,
                     )
                   : null,
@@ -559,5 +559,18 @@ class _UsersScreenState extends State<UsersScreen> {
         ),
       ),
     );
+  }
+}
+
+IconData _officialIconForUser(Map<String, dynamic> user) {
+  final key = OfficialAccounts.byId(user['officialAccountId']?.toString())?.iconKey;
+  switch (key) {
+    case 'restaurant': return Icons.restaurant;
+    case 'menu_book': return Icons.menu_book;
+    case 'badge': return Icons.badge;
+    case 'payments': return Icons.payments;
+    case 'school': return Icons.school;
+    case 'groups': return Icons.groups;
+    default: return Icons.support_agent;
   }
 }

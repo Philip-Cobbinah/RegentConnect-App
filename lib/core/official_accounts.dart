@@ -23,6 +23,16 @@ class OfficialAccountDefinition {
 
   String get shortId => id.replaceFirst('official:', '');
 
+  String get iconKey {
+    if (id == 'official:canteen') return 'restaurant';
+    if (id == 'official:academic-unit') return 'menu_book';
+    if (id == 'official:registrar') return 'badge';
+    if (id == 'official:finance') return 'payments';
+    if (id == 'official:admissions') return 'school';
+    if (id.startsWith('official:hod-')) return 'groups';
+    return 'support_agent';
+  }
+
   Map<String, dynamic> toFirestoreMap({
     String? linkedAuthUid,
     bool active = false,
@@ -372,6 +382,8 @@ class OfficialAccounts {
         user['email'],
         user['program'],
         user['department'],
+        user['office'],
+        user['searchTerms'],
         user['role'],
         user['session'],
       ].whereType<Object>().join(' ').toLowerCase();

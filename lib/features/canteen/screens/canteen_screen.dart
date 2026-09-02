@@ -39,6 +39,9 @@ class _CanteenScreenState extends State<CanteenScreen> {
     _MenuItem(name: 'Spring rolls', category: 'Snacks', price: 12, description: 'Crispy vegetable spring rolls'),
     _MenuItem(name: 'Sobolo', category: 'Drinks', price: 10, description: 'Chilled hibiscus drink'),
     _MenuItem(name: 'Bottled water', category: 'Drinks', price: 5, description: '500ml bottled water'),
+    _MenuItem(name: 'Fruit smoothie', category: 'Drinks', price: 18, description: 'Fresh blended seasonal fruit'),
+    _MenuItem(name: 'Tea', category: 'Drinks', price: 12, description: 'Hot tea served with milk'),
+    _MenuItem(name: 'Bread and egg', category: 'Snacks', price: 20, description: 'Fresh bread with seasoned egg'),
   ];
 
   final Map<String, int> _cart = {};
@@ -200,11 +203,11 @@ class _CanteenScreenState extends State<CanteenScreen> {
 
   Widget _menuCard(_MenuItem item) {
     final quantity = _cart[item.name] ?? 0;
-    final icon = item.category == 'Drinks' ? Icons.local_drink : item.category == 'Snacks' ? Icons.cookie_outlined : Icons.rice_bowl;
+    final emoji = item.category == 'Drinks' ? (item.name == 'Bottled water' ? '💧' : '🥤') : item.category == 'Snacks' ? '🥪' : '🍛';
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(padding: const EdgeInsets.all(14), child: Row(children: [
-        Container(width: 58, height: 58, decoration: BoxDecoration(color: RegentColors.primarySoft, borderRadius: BorderRadius.circular(16)), child: Icon(icon, color: RegentColors.primaryDark, size: 30)),
+        Container(width: 58, height: 58, decoration: BoxDecoration(color: RegentColors.primarySoft, borderRadius: BorderRadius.circular(16)), child: Center(child: Text(emoji, style: const TextStyle(fontSize: 27)))),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(item.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)), const SizedBox(height: 4), Text(item.description, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)), const SizedBox(height: 6), Text('GH₵ ${item.price.toStringAsFixed(2)}', style: const TextStyle(color: RegentColors.primaryDark, fontWeight: FontWeight.w800))])),
         if (quantity == 0) IconButton(onPressed: () => _changeQuantity(item, 1), icon: const Icon(Icons.add_circle, color: RegentColors.primaryBright), tooltip: 'Add to cart') else Row(children: [IconButton(onPressed: () => _changeQuantity(item, -1), icon: const Icon(Icons.remove_circle_outline)), Text('$quantity', style: const TextStyle(fontWeight: FontWeight.bold)), IconButton(onPressed: () => _changeQuantity(item, 1), icon: const Icon(Icons.add_circle, color: RegentColors.primaryBright))]),
