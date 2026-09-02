@@ -3825,7 +3825,7 @@ class _DMScreenState extends State<DMScreen> {
                           controller: _messageController,
                           cursorColor: RegentColors.darkViolet,
                           minLines: 1,
-                          maxLines: 5,
+                          maxLines: 8,
                           keyboardType: TextInputType.multiline,
                           style: const TextStyle(
                             color: Colors.white,

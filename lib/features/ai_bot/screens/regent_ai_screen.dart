@@ -920,7 +920,7 @@ How can I assist you today?''',
                     )),
                 child: TextField(
                   controller: _messageController,
-                  maxLines: 6,
+                  maxLines: 8,
                   minLines: 1,
                   maxLength: _maxPromptLength,
                   style: const TextStyle(
