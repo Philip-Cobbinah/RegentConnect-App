@@ -205,7 +205,7 @@ class _ChatListTabState extends State<ChatListTab> {
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 22,
                   backgroundColor: RegentColors.violet,
                   child: Icon(_officialIconForKey(account.iconKey), color: Colors.white),
