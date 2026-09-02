@@ -1420,17 +1420,6 @@ class _DMScreenState extends State<DMScreen> {
 
   void _startCall(bool isVideo) async {
     if (_isStartingCall) return;
-    if (OfficialAccounts.isOfficialIdentity(widget.recipientId)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Calls to official offices are not available yet. Please use chat.',
-          ),
-        ),
-      );
-      return;
-    }
-
     setState(() => _isStartingCall = true);
     try {
       final currentUserData =

@@ -26,6 +26,7 @@ import 'features/users/screens/users_screen.dart';
 import 'services/auth_service.dart';
 import 'services/official_office_service.dart';
 import 'features/broadcast/screens/broadcast_screen.dart';
+import 'features/canteen/screens/canteen_screen.dart';
 import 'widgets/incoming_call_overlay.dart';
 import 'core/student_progress.dart';
 
@@ -198,6 +199,7 @@ class MyApp extends StatelessWidget {
             '/settings': (context) => const SettingsScreen(),
             '/alumni': (context) => const AlumniHubScreen(),
             '/regent-info': (context) => const RegentUniversityInfoScreen(),
+            '/canteen': (context) => const CanteenScreen(),
           },
         );
       },

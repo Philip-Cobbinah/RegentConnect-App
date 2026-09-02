@@ -1484,11 +1484,29 @@ class _AcademicCalendarScreenState extends State<AcademicCalendarScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: ExpansionTile(
         leading: const Icon(Icons.payments_rounded, color: RegentColors.violet),
-        title: const Text('2026/2027 tuition fees', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text('Tuition fees', style: TextStyle(fontWeight: FontWeight.w800)),
         subtitle: const Text('Regular and Weekend school fees'),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
-          const Text('Published tuition fees by student category and school.', style: TextStyle(fontWeight: FontWeight.w600)),
+          const Text('Published fees by student category and school.', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 14),
+          const Text('2025/26 regular students (Ghanaian)', style: TextStyle(fontWeight: FontWeight.w800, color: RegentColors.primaryDark)),
+          const SizedBox(height: 6),
+          _feeTable([
+            ['Student type', 'SBLL', 'FAS', 'FECAS'],
+            ['Continuing', 'GHS 3,049.00', 'GHS 3,049.00', 'GHS 3,335.00'],
+            ['New', 'GHS 3,269.00', 'GHS 3,269.00', 'GHS 3,555.20'],
+          ]),
+          const SizedBox(height: 14),
+          const Text('2025/26 regular students (International)', style: TextStyle(fontWeight: FontWeight.w800, color: RegentColors.primaryDark)),
+          const SizedBox(height: 6),
+          _feeTable([
+            ['Student type', 'SBLL', 'FAS', 'FECAS'],
+            ['Continuing', 'GHS 7,532.25', 'GHS 7,532.25', 'GHS 8,246.98'],
+            ['New', 'GHS 7,532.25', 'GHS 7,532.25', 'GHS 8,246.98'],
+          ]),
+          const SizedBox(height: 14),
+          const Text('2026/27 reference fees', style: TextStyle(fontWeight: FontWeight.w800, color: RegentColors.primaryDark)),
           const SizedBox(height: 8),
           ...feeRows.map((row) => Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -1503,6 +1521,36 @@ class _AcademicCalendarScreenState extends State<AcademicCalendarScreen> {
               )),
         ],
       ),
+    );
+  }
+
+  Widget _feeTable(List<List<String>> rows) {
+    return Table(
+      border: TableBorder.all(color: RegentColors.primarySoft),
+      columnWidths: const {
+        0: FlexColumnWidth(1.4),
+        1: FlexColumnWidth(1),
+        2: FlexColumnWidth(1),
+        3: FlexColumnWidth(1),
+      },
+      children: rows
+          .map((row) => TableRow(
+                children: row
+                    .map((cell) => Padding(
+                          padding: const EdgeInsets.all(7),
+                          child: Text(
+                            cell,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: row == rows.first
+                                  ? FontWeight.w800
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ))
+                    .toList(),
+              ))
+          .toList(),
     );
   }
 

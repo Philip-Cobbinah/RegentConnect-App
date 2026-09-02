@@ -542,6 +542,22 @@ class _MainScreenState extends State<MainScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.restaurant, color: Colors.redAccent),
+                ),
+                title: const Text('Regent Canteen'),
+                subtitle: const Text('Pre-order meals, drinks and snacks'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/canteen');
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
                     color: Colors.blue.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),

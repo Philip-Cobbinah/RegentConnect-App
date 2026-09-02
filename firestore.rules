@@ -24,6 +24,7 @@ service cloud.firestore {
         email == 'accounts@regent.edu.gh' ? 'official:finance' :
         email == 'ess@regent.edu.gh' ? 'official:ess-client-assurance' :
         email == 'src@regent.edu.gh' ? 'official:src' :
+        email == 'canteen@regent.edu.gh' ? 'official:canteen' :
         email == 'hod.computing-it@regent.edu.gh' ? 'official:hod-computing-it' :
         email == 'hod.engineering@regent.edu.gh' ? 'official:hod-engineering' :
         email == 'hod.business@regent.edu.gh' ? 'official:hod-business' :
@@ -522,6 +523,16 @@ service cloud.firestore {
           isOfficialEmail() ||
           isAdmin()
         );
+    }
+
+    match /canteen_orders/{orderId} {
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if signedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin() || isOfficialEmail());
+      allow update: if signedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin() || isOfficialEmail());
+      allow delete: if signedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     match /streaks/{streakId} {
