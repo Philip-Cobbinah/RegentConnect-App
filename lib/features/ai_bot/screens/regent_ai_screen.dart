@@ -892,13 +892,23 @@ How can I assist you today?''',
       child: SafeArea(
         child: Row(
           children: [
-            IconButton(
-                icon: const Icon(Icons.camera_alt, color: RegentColors.violet),
-                onPressed: _captureFromCamera),
-            IconButton(
-                icon: const Icon(Icons.add_photo_alternate,
-                    color: RegentColors.lightViolet),
-                onPressed: _uploadFromGallery),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: 'Take a photo',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.camera_alt, color: RegentColors.lightViolet),
+                  onPressed: _captureFromCamera,
+                ),
+                IconButton(
+                  tooltip: 'Choose an image',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.add_photo_alternate, color: RegentColors.lightViolet),
+                  onPressed: _uploadFromGallery,
+                ),
+              ],
+            ),
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -913,7 +923,13 @@ How can I assist you today?''',
                   maxLines: 6,
                   minLines: 1,
                   maxLength: _maxPromptLength,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    height: 1.35,
+                  ),
+                  cursorColor: RegentColors.lightViolet,
+                  enableInteractiveSelection: true,
                   textCapitalization: TextCapitalization.sentences,
                   keyboardType: TextInputType.multiline,
                   textInputAction: TextInputAction.newline,
@@ -937,23 +953,32 @@ How can I assist you today?''',
                 ),
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.mic, color: Colors.redAccent),
-              onPressed: _startRecording,
-            ),
-            Container(
-              decoration: const BoxDecoration(
-                  color: RegentColors.violet, shape: BoxShape.circle),
-              child: IconButton(
-                icon: _isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.send, color: Colors.white),
-                onPressed: _isLoading ? null : _sendMessage,
-              ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: 'Record a voice question',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.mic, color: Colors.redAccent),
+                  onPressed: _startRecording,
+                ),
+                Container(
+                  decoration: const BoxDecoration(
+                      color: RegentColors.violet, shape: BoxShape.circle),
+                  child: IconButton(
+                    tooltip: 'Send to Regent AI',
+                    visualDensity: VisualDensity.compact,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.send, color: Colors.white),
+                    onPressed: _isLoading ? null : _sendMessage,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
