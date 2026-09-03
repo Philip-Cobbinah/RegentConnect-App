@@ -1,30 +1,30 @@
 import 'dart:typed_data';
-
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 import '../core/api_keys.dart';
 
 class AIService {
-  late GenerativeModel _model;
-  late ChatSession _chatSession;
+  final String _apiKey = ApiKeys.deepseekApiKey;
+  final String _baseUrl = 'https://api.deepseek.com/chat/completions';
+  final List<Map<String, String>> _chatHistory = [];
 
-  AIService() {
-    _model = GenerativeModel(
-      model: 'gemini-2.0-flash',
-      apiKey: ApiKeys.geminiApiKey,
-      generationConfig: GenerationConfig(
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 2048,
-      ),
-    );
-
-    _chatSession = _model.startChat();
-  }
+  static const String _model = 'deepseek-chat';
+  static const double _temperature = 0.7;
+  static const int _maxTokens = 2048;
 
   Future<String> sendMessage(String message) async {
     try {
+      if (_apiKey.isEmpty) {
+        return 'Error: DeepSeek API key not configured. Please set DEEPSEEK_API_KEY environment variable.';
+      }
+
+      // Add user message to history
+      _chatHistory.add({
+        'role': 'user',
+        'content': message,
+      });
+
       final contextualMessage =
           '''You are Regent AI, an intelligent academic assistant for Regent University students.
 You have access to real-time information and can provide accurate answers to academic questions.
@@ -36,21 +36,58 @@ When answering questions:
 4. Offer practical examples
 5. Suggest further learning resources
 
-Be helpful, friendly, and educational in your responses.
+Be helpful, friendly, and educational in your responses.''';
 
-User Question: $message''';
+      final messages = [
+        {
+          'role': 'system',
+          'content': contextualMessage,
+        },
+        ..._chatHistory,
+      ];
 
-      final response = await _chatSession.sendMessage(
-        Content.text(contextualMessage),
+      final response = await http.post(
+        Uri.parse(_baseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'messages': messages,
+          'temperature': _temperature,
+          'max_tokens': _maxTokens,
+          'stream': false,
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw Exception('Request timeout'),
       );
 
-      if (response.text != null && response.text!.isNotEmpty) {
-        return response.text!;
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final assistantMessage =
+            data['choices']?[0]?['message']?['content'] ?? '';
+
+        if (assistantMessage.isNotEmpty) {
+          // Add assistant response to history
+          _chatHistory.add({
+            'role': 'assistant',
+            'content': assistantMessage,
+          });
+
+          return assistantMessage;
+        }
+        return 'Sorry, I could not process your question. Please try again.';
+      } else if (response.statusCode == 401) {
+        return 'Error: Invalid DeepSeek API key. Please check your configuration.';
+      } else if (response.statusCode == 429) {
+        return 'Error: Rate limit exceeded. Please wait a moment and try again.';
+      } else {
+        return 'Error: Failed to get response from DeepSeek API. Status: ${response.statusCode}';
       }
-      return 'Sorry, I could not process your question. Please try again.';
     } catch (e) {
-      return 'Error: Unable to get response. Please check your API key and '
-          'internet connection. Error details: $e';
+      return 'Error: Unable to get response. Please check your API key and internet connection. Error details: $e';
     }
   }
 
@@ -82,23 +119,73 @@ Be thorough but concise in your explanation.
     String? customPrompt,
   }) async {
     try {
+      if (_apiKey.isEmpty) {
+        return 'Error: DeepSeek API key not configured.';
+      }
+
       final prompt = customPrompt ??
           '''You are Regent AI, an academic assistant. Analyze this image and provide a detailed explanation.
 If it contains a math problem, solve it step by step with clear working.
 If it's a diagram or chart, explain what it shows and provide insights.
 Be educational and helpful in your response.''';
 
-      final response = await _chatSession.sendMessage(
-        Content.multi([
-          TextPart(prompt),
-          DataPart(mimeType, imageBytes),
-        ]),
+      // Convert image bytes to base64
+      final base64Image = base64Encode(imageBytes);
+
+      // Determine media type for base64 encoding
+      String mediaType = 'image/jpeg';
+      if (mimeType.contains('png')) {
+        mediaType = 'image/png';
+      } else if (mimeType.contains('gif')) {
+        mediaType = 'image/gif';
+      } else if (mimeType.contains('webp')) {
+        mediaType = 'image/webp';
+      }
+
+      final response = await http.post(
+        Uri.parse(_baseUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'messages': [
+            {
+              'role': 'user',
+              'content': [
+                {
+                  'type': 'text',
+                  'text': prompt,
+                },
+                {
+                  'type': 'image_url',
+                  'image_url': {
+                    'url': 'data:$mediaType;base64,$base64Image',
+                  },
+                },
+              ],
+            },
+          ],
+          'temperature': _temperature,
+          'max_tokens': _maxTokens,
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw Exception('Request timeout'),
       );
 
-      if (response.text != null && response.text!.isNotEmpty) {
-        return response.text!;
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final result = data['choices']?[0]?['message']?['content'] ?? '';
+
+        if (result.isNotEmpty) {
+          return result;
+        }
+        return 'Sorry, I could not analyze the image. Please try again.';
+      } else {
+        return 'Error analyzing image: Status ${response.statusCode}';
       }
-      return 'Sorry, I could not analyze the image. Please try again.';
     } catch (e) {
       return 'Error analyzing image: $e';
     }
@@ -121,14 +208,14 @@ What would you like help with?''';
   }
 
   void resetChat() {
-    _chatSession = _model.startChat();
+    _chatHistory.clear();
   }
 
-  List<Content> getChatHistory() {
-    return _chatSession.history.toList();
+  List<Map<String, String>> getChatHistory() {
+    return List.from(_chatHistory);
   }
 
   void clearChatHistory() {
-    _chatSession = _model.startChat();
+    _chatHistory.clear();
   }
 }
