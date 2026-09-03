@@ -193,7 +193,7 @@ class _CreateStatusScreenState extends State<CreateStatusScreen> {
           WebUiSettings(
             context: context,
             presentStyle: WebPresentStyle.dialog,
-            size: const CropperSize(width: 560, height: 560),
+            size: const CropperSize(width: 360, height: 360),
           ),
         ],
       );
@@ -947,37 +947,36 @@ class _CreateStatusScreenState extends State<CreateStatusScreen> {
     }
     final snapshot = await FirebaseFirestore.instance.collection('users').limit(100).get();
     if (!mounted) return;
+    final searchController = TextEditingController();
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: RegentColors.dmSurface,
-      builder: (sheetContext) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: snapshot.docs.where((doc) => doc.id != _statusService.currentUserId).map((doc) {
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          final query = searchController.text.trim().toLowerCase();
+          final users = snapshot.docs.where((doc) {
+            if (doc.id == _statusService.currentUserId) return false;
             final data = doc.data();
-            final name = (data['fullName'] ?? data['displayName'] ?? data['email'] ?? doc.id).toString();
-            final selected = _mentionedUserIds.contains(doc.id);
-            return ListTile(
-              leading: const Icon(Icons.person, color: RegentColors.lightViolet),
-              title: Text(name, style: const TextStyle(color: Colors.white)),
-              trailing: selected ? const Icon(Icons.check, color: Colors.greenAccent) : null,
-              onTap: selected || _mentionedUserIds.length < 5 ? () {
-                setState(() {
-                  if (selected) {
-                    _mentionedUserIds.remove(doc.id);
-                    _mentionedUserNames.remove(doc.id);
-                  } else {
-                    _mentionedUserIds.add(doc.id);
-                    _mentionedUserNames[doc.id] = name;
-                  }
-                });
-                Navigator.pop(sheetContext);
-              } : null,
-            );
-          }).toList(),
-        ),
+            final name = (data['fullName'] ?? data['displayName'] ?? data['email'] ?? doc.id).toString().toLowerCase();
+            return query.isEmpty || name.contains(query) || doc.id.toLowerCase().contains(query);
+          }).toList();
+          return SafeArea(child: Padding(padding: const EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Mention privately', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 10),
+            TextField(controller: searchController, onChanged: (_) => setSheetState(() {}), style: const TextStyle(color: Colors.white), decoration: const InputDecoration(hintText: 'Search users by name or email', hintStyle: TextStyle(color: Colors.white54), prefixIcon: Icon(Icons.search, color: RegentColors.lightViolet))),
+            const SizedBox(height: 8),
+            SizedBox(height: MediaQuery.of(context).size.height * .5, child: ListView(shrinkWrap: true, children: users.map((doc) {
+              final data = doc.data();
+              final name = (data['fullName'] ?? data['displayName'] ?? data['email'] ?? doc.id).toString();
+              final selected = _mentionedUserIds.contains(doc.id);
+              return ListTile(leading: const Icon(Icons.person, color: RegentColors.lightViolet), title: Text(name, style: const TextStyle(color: Colors.white)), trailing: selected ? const Icon(Icons.check, color: Colors.greenAccent) : null, onTap: selected || _mentionedUserIds.length < 5 ? () { setState(() { if (selected) { _mentionedUserIds.remove(doc.id); _mentionedUserNames.remove(doc.id); } else { _mentionedUserIds.add(doc.id); _mentionedUserNames[doc.id] = name; } }); Navigator.pop(sheetContext); } : null);
+            }).toList())),
+          ])));
+        },
       ),
     );
+    searchController.dispose();
   }
 
   void _showGroupTagPicker() {

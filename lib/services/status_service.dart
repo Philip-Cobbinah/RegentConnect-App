@@ -117,6 +117,10 @@ class StatusService {
     final validMentions = [...?mentionedUserIds]
       ..removeWhere((userId) => userId == currentUserId);
     for (final userId in validMentions.take(5)) {
+      final mentionedUser = await _firestore.collection('users').doc(userId).get();
+      if (!mentionedUser.exists || mentionedUser.data()?['allowStatusMentions'] == false) {
+        continue;
+      }
       batch.set(_firestore.collection('status_mentions').doc('${statusId}_$userId'), {
         'statusId': statusId,
         'recipientId': userId,

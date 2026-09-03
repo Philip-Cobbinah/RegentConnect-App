@@ -215,6 +215,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (value) => _updateSetting('readReceipts', value),
               ),
 
+              SwitchListTile(
+                secondary: Icon(Icons.alternate_email,
+                    color: isDark ? Colors.white70 : RegentColors.blue),
+                title: Text('Allow status mentions',
+                    style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87)),
+                subtitle: Text('Let other users privately mention you in status posts',
+                    style: TextStyle(
+                        color: isDark ? Colors.white70 : Colors.grey)),
+                value: userData['allowStatusMentions'] ?? true,
+                onChanged: (value) => _updateSetting('allowStatusMentions', value),
+              ),
+
               // Notifications
               _buildSectionHeader('Notifications', isDark),
 
