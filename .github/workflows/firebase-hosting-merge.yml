@@ -15,7 +15,7 @@ jobs:
         with:
           channel: 'stable'
       - run: flutter pub get
-      - run: flutter build web --release --no-wasm-dry-run --dart-define=DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}
+      - run: flutter build web --release --no-wasm-dry-run --dart-define=DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }} --dart-define=CALL_TURN_URL=${{ secrets.CALL_TURN_URL }} --dart-define=CALL_TURN_USERNAME=${{ secrets.CALL_TURN_USERNAME }} --dart-define=CALL_TURN_CREDENTIAL=${{ secrets.CALL_TURN_CREDENTIAL }}
       - name: Deploy Firestore security rules
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_REGENT_CONNECT_85439 }}

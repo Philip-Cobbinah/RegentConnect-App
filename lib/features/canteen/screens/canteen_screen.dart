@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme.dart';
+import '../../../services/chat_service.dart';
 
 class _MenuItem {
   const _MenuItem({
@@ -101,6 +102,11 @@ class _CanteenScreenState extends State<CanteenScreen> {
     if (user == null) return;
     setState(() => _isSubmitting = true);
     final delivery = details['fulfilment'] == 'Delivery';
+    final orderLines = _cart.entries.map((entry) {
+      final item = _menu.firstWhere((menuItem) => menuItem.name == entry.key);
+      return '${entry.value} × ${item.name} (GH₵ ${(item.price * entry.value).toStringAsFixed(2)})';
+    }).join('\n');
+    final total = _subtotal + (delivery ? _deliveryFee : 0);
     try {
       await FirebaseFirestore.instance.collection('canteen_orders').add({
         'userId': user.uid,
@@ -115,12 +121,20 @@ class _CanteenScreenState extends State<CanteenScreen> {
         'momoNumber': details['momoNumber'],
         'subtotal': _subtotal,
         'deliveryFee': delivery ? _deliveryFee : 0,
-        'total': _subtotal + (delivery ? _deliveryFee : 0),
+        'total': total,
         'paymentMethod': 'Mobile Money',
         'paymentStatus': 'Awaiting confirmation',
         'orderStatus': 'Received',
         'createdAt': FieldValue.serverTimestamp(),
       });
+      try {
+        await ChatService().sendMessage(
+          receiverId: 'official:canteen',
+          message: 'New Canteen order\n$orderLines\n\n${details['fulfilment']}: ${details['location']?.isEmpty == true ? 'Campus pickup' : details['location']}\nTotal: GH₵ ${total.toStringAsFixed(2)}\nMoMo: ${details['momoNumber']}',
+        );
+      } catch (error) {
+        debugPrint('Canteen order DM notification deferred: $error');
+      }
       if (!mounted) return;
       setState(() => _cart.clear());
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
