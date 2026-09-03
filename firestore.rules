@@ -5,7 +5,8 @@ service cloud.firestore {
     function signedIn() {
       return request.auth != null &&
         request.auth.token.email is string &&
-        request.auth.token.email.matches('^[^@]+@regent[.]edu[.]gh$');
+        (request.auth.token.email == 'regentcanteen@gmail.com' ||
+          request.auth.token.email.matches('^[^@]+@regent[.]edu[.]gh$'));
     }
 
     function owns(userId) {
@@ -24,7 +25,7 @@ service cloud.firestore {
         email == 'accounts@regent.edu.gh' ? 'official:finance' :
         email == 'ess@regent.edu.gh' ? 'official:ess-client-assurance' :
         email == 'src@regent.edu.gh' ? 'official:src' :
-        email == 'canteen@regent.edu.gh' ? 'official:canteen' :
+        email == 'regentcanteen@gmail.com' ? 'official:canteen' :
         email == 'hod.computing-it@regent.edu.gh' ? 'official:hod-computing-it' :
         email == 'hod.engineering@regent.edu.gh' ? 'official:hod-engineering' :
         email == 'hod.business@regent.edu.gh' ? 'official:hod-business' :

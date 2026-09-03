@@ -195,7 +195,7 @@ class OfficialAccounts {
       id: 'official:canteen',
       name: 'Regent Canteen',
       office: 'Regent Canteen and Campus Food Vendors',
-      email: 'canteen@regent.edu.gh',
+      email: 'regentcanteen@gmail.com',
       description: 'Meal pre-orders, pickup times, campus delivery and order enquiries.',
       responseHours: 'Monday-Saturday, 8:00 AM-6:00 PM',
       searchKeywords: ['canteen', 'food', 'jollof', 'fried rice', 'delivery', 'order', 'momo'],

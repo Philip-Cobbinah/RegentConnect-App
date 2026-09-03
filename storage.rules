@@ -5,7 +5,8 @@ service firebase.storage {
     function signedIn() {
       return request.auth != null &&
         request.auth.token.email is string &&
-        request.auth.token.email.matches('^[^@]+@regent[.]edu[.]gh$');
+        (request.auth.token.email == 'regentcanteen@gmail.com' ||
+          request.auth.token.email.matches('^[^@]+@regent[.]edu[.]gh$'));
     }
 
     function isAdmin() {
@@ -20,6 +21,7 @@ service firebase.storage {
         email == 'accounts@regent.edu.gh' ? 'official:finance' :
         email == 'ess@regent.edu.gh' ? 'official:ess-client-assurance' :
         email == 'src@regent.edu.gh' ? 'official:src' :
+        email == 'regentcanteen@gmail.com' ? 'official:canteen' :
         null;
     }
 

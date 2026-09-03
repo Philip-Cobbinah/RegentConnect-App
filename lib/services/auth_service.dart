@@ -13,8 +13,10 @@ class AuthService {
   Stream<User?> get idTokenChanges => _auth.idTokenChanges();
 
   static bool isRegentEmail(String email) {
-    return RegExp(r'^[^@\s]+@regent\.edu\.gh$', caseSensitive: false)
-        .hasMatch(email.trim());
+    final normalized = email.trim().toLowerCase();
+    return normalized == 'regentcanteen@gmail.com' ||
+        RegExp(r'^[^@\s]+@regent\.edu\.gh$', caseSensitive: false)
+            .hasMatch(normalized);
   }
 
   Future<void> syncCurrentUserBackend() async {

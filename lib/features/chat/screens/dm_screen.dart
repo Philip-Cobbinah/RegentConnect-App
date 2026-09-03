@@ -1285,28 +1285,28 @@ class _DMScreenState extends State<DMScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const ListTile(
-              leading: Icon(Icons.looks_one, color: RegentColors.lightViolet),
-              title: Text('Send view once'),
-              subtitle: Text('The recipient can open it only one time.'),
+              leading: _ViewOnceBadge(),
+              title: Text('Send view once', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              subtitle: Text('The recipient can open it only one time.', style: TextStyle(color: Colors.white70)),
             ),
             ListTile(
-              leading: const Icon(Icons.chat_bubble_outline),
-              title: const Text('Text message'),
+              leading: const Icon(Icons.chat_bubble_outline, color: Colors.white70),
+              title: const Text('Text message', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(sheetContext, 'text'),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Photo'),
+              leading: const Icon(Icons.photo_library_outlined, color: Colors.white70),
+              title: const Text('Photo', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(sheetContext, 'photo'),
             ),
             ListTile(
-              leading: const Icon(Icons.video_library_outlined),
-              title: const Text('Video'),
+              leading: const Icon(Icons.video_library_outlined, color: Colors.white70),
+              title: const Text('Video', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(sheetContext, 'video'),
             ),
             ListTile(
-              leading: const Icon(Icons.mic_none_rounded),
-              title: const Text('Voice message'),
+              leading: const Icon(Icons.mic_none_rounded, color: Colors.white70),
+              title: const Text('Voice message', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(sheetContext, 'audio'),
             ),
           ],
@@ -2207,10 +2207,10 @@ class _DMScreenState extends State<DMScreen> {
     }
     return InkWell(
       onTap: () => _openViewOnceTextDialog(data['message']?.toString() ?? '', messageId),
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.looks_one, color: Colors.white, size: 26),
+          const _ViewOnceBadge(),
           SizedBox(width: 8),
           Text('Tap to view once', style: TextStyle(color: Colors.white)),
         ],
@@ -3843,10 +3843,7 @@ class _DMScreenState extends State<DMScreen> {
                         IconButton(
                           tooltip: 'Send view once',
                           visualDensity: VisualDensity.compact,
-                          icon: Icon(Icons.looks_one,
-                              color: _viewOnceTextEnabled
-                                  ? Colors.lightGreenAccent
-                                  : RegentColors.lightViolet),
+                          icon: _ViewOnceBadge(active: _viewOnceTextEnabled),
                           onPressed: _showViewOnceMenu,
                         ),
                         IconButton(
@@ -3968,5 +3965,35 @@ class _DMScreenState extends State<DMScreen> {
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
+  }
+}
+
+class _ViewOnceBadge extends StatelessWidget {
+  const _ViewOnceBadge({this.active = false});
+
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 25,
+      height: 25,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: active ? Colors.lightGreenAccent : RegentColors.lightViolet,
+          width: 2,
+        ),
+      ),
+      child: Text(
+        '1',
+        style: TextStyle(
+          color: active ? Colors.lightGreenAccent : Colors.white,
+          fontWeight: FontWeight.w800,
+          fontSize: 14,
+        ),
+      ),
+    );
   }
 }
