@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -64,6 +65,17 @@ class _AppBootstrapState extends State<AppBootstrap> {
         );
       }
 
+      // Safari private browsing and restrictive WebViews can reject the
+      // default IndexedDB-backed auth persistence. Firebase remains usable,
+      // so fall back to memory persistence instead of blocking the app.
+      if (kIsWeb) {
+        try {
+          await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+        } catch (_) {
+          await FirebaseAuth.instance.setPersistence(Persistence.NONE);
+        }
+      }
+
       const useEmulators =
           bool.fromEnvironment('USE_FIREBASE_EMULATORS', defaultValue: false);
       if (useEmulators) {
@@ -75,7 +87,12 @@ class _AppBootstrapState extends State<AppBootstrap> {
       return Firebase.app();
     }
 
-    return initialize();
+    return initialize().timeout(
+      const Duration(seconds: 25),
+      onTimeout: () => throw Exception(
+        'Firebase initialization timed out. Check Safari network permissions or try again.',
+      ),
+    );
   }
 
   void _retry() {

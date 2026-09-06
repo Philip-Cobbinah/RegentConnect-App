@@ -40,6 +40,7 @@ class _CreateStatusScreenState extends State<CreateStatusScreen> {
   String? _mediaError;
   bool _handlingVideoBoundary = false;
   bool _isPosting = false;
+  bool _isCropping = false;
   bool _allowReshare = true;
   bool _isMuted = false;
   String _selectedColor = '#7C4DFF';
@@ -161,7 +162,8 @@ class _CreateStatusScreenState extends State<CreateStatusScreen> {
 
   Future<void> _cropImage() async {
     final sourcePath = _cropSourcePath;
-    if (sourcePath == null) return;
+    if (sourcePath == null || _isCropping || _isPosting) return;
+    setState(() => _isCropping = true);
     try {
       final cropped = await ImageCropper().cropImage(
         sourcePath: sourcePath,
@@ -214,6 +216,8 @@ class _CreateStatusScreenState extends State<CreateStatusScreen> {
           content: Text('The image editor could not open this file.'),
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isCropping = false);
     }
   }
 
@@ -349,7 +353,7 @@ class _CreateStatusScreenState extends State<CreateStatusScreen> {
           if (widget.type == 'image')
             IconButton(
               tooltip: 'Crop and rotate',
-              onPressed: _imageBytes == null ? null : _cropImage,
+              onPressed: _imageBytes == null || _isCropping ? null : _cropImage,
               icon: const Icon(Icons.crop_rotate, color: Colors.white),
             ),
           if (widget.type != 'text')
@@ -403,7 +407,7 @@ class _CreateStatusScreenState extends State<CreateStatusScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: RegentColors.primaryBright,
-        onPressed: _isPosting ? null : _postStatus,
+        onPressed: _isPosting || _isCropping ? null : _postStatus,
         icon: _isPosting
             ? const SizedBox(
                 width: 20,
@@ -415,7 +419,11 @@ class _CreateStatusScreenState extends State<CreateStatusScreen> {
               )
             : const Icon(Icons.send_rounded, color: Colors.white),
         label: Text(
-          _isPosting ? 'Posting...' : 'Post',
+          _isCropping
+              ? 'Editing...'
+              : _isPosting
+                  ? 'Posting...'
+                  : 'Post',
           style: const TextStyle(color: Colors.white),
         ),
       ),

@@ -161,26 +161,33 @@ class StatusService {
           '${DateTime.now().millisecondsSinceEpoch}_${safeName.isEmpty ? type : safeName}';
       final ref =
           _storage.ref().child('status_media/$currentUserId/$type/$fileName');
-      await ref.putData(
-        bytes,
-        SettableMetadata(
-          contentType: resolvedContentType,
-          customMetadata: {
-            'uploaderUid': currentUserId,
-            'mediaType': type,
-            'originalName': originalName,
-          },
-        ),
-      );
+      await ref
+          .putData(
+            bytes,
+            SettableMetadata(
+              contentType: resolvedContentType,
+              customMetadata: {
+                'uploaderUid': currentUserId,
+                'mediaType': type,
+                'originalName': originalName,
+              },
+            ),
+          )
+          .timeout(const Duration(seconds: 60));
       return StatusMediaUpload(
-        url: await ref.getDownloadURL(),
+        url: await ref.getDownloadURL().timeout(const Duration(seconds: 30)),
         storagePath: ref.fullPath,
         contentType: resolvedContentType,
         size: bytes.length,
       );
+    } on FirebaseException catch (e) {
+      debugPrint('Error uploading status media (${e.code}): ${e.message}');
+      throw Exception(
+        'Media upload failed (${e.code}). Check Firebase Storage rules and try again.',
+      );
     } catch (e) {
       debugPrint('Error uploading status media: $e');
-      return null;
+      throw Exception('Media upload failed. Check your connection and try again.');
     }
   }
 
