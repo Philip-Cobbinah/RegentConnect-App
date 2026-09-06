@@ -10,8 +10,8 @@ class AIService {
   final List<Map<String, String>> _chatHistory = [];
 
   static const String _model = 'deepseek-chat';
-  static const double _temperature = 0.7;
-  static const int _maxTokens = 2048;
+  static const double _temperature = 0.35;
+  static const int _maxTokens = 1200;
 
   Future<String> sendMessage(String message) async {
     try {
@@ -25,18 +25,9 @@ class AIService {
         'content': message,
       });
 
-      final contextualMessage =
-          '''You are Regent AI, an intelligent academic assistant for Regent University students.
-You have access to real-time information and can provide accurate answers to academic questions.
+      const contextualMessage = '''You are Regent AI, a precise academic assistant for Regent University students.
 
-When answering questions:
-1. Provide accurate, detailed information
-2. Cite sources when relevant
-3. Explain concepts clearly for students
-4. Offer practical examples
-5. Suggest further learning resources
-
-Be helpful, friendly, and educational in your responses.''';
+Answer the user's exact question directly and put the answer first. Be concise: normally use 1-3 short paragraphs or at most 6 bullet points. Give only the explanation needed to answer the question. Do not begin with phrases such as "Great question" or a long introduction. Do not add analogies, extra examples, learning resources, repeated conclusions, or unrelated context unless the user asks for them. Use a small table only when it makes a comparison clearer. For calculations or technical questions, show only the necessary steps. Use clear plain language and accurate facts.''';
 
       final messages = [
         {
@@ -97,15 +88,9 @@ Be helpful, friendly, and educational in your responses.''';
     String userPrompt,
   ) async {
     try {
-      final prompt = '''
-$userPrompt
+      final prompt = '''$userPrompt
 
-Please analyze the image and provide a detailed, helpful response based on the user's request.
-If it's a math problem, solve it step by step.
-If it's a diagram, explain it clearly.
-If it's text, read and interpret it.
-Be thorough but concise in your explanation.
-''';
+Answer the request directly and concisely. Do not add an introduction, analogy, unrelated examples, or extra study advice unless requested. If it is a calculation, show only the necessary working. If it is text or a diagram, state the key answer first.''';
 
       return await analyzeImage(imageBytes, mimeType, customPrompt: prompt);
     } catch (e) {
@@ -124,10 +109,7 @@ Be thorough but concise in your explanation.
       }
 
       final prompt = customPrompt ??
-          '''You are Regent AI, an academic assistant. Analyze this image and provide a detailed explanation.
-If it contains a math problem, solve it step by step with clear working.
-If it's a diagram or chart, explain what it shows and provide insights.
-Be educational and helpful in your response.''';
+          '''You are Regent AI. Analyze this image and answer directly in a concise format. State the key answer first. Show only necessary working for mathematics and avoid unrelated examples or explanations.''';
 
       // Convert image bytes to base64
       final base64Image = base64Encode(imageBytes);
