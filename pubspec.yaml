@@ -51,3 +51,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/academic/resit_supplementary_exams_14_18_26.pdf

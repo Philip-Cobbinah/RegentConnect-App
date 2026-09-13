@@ -1371,6 +1371,8 @@ class _AcademicCalendarScreenState extends State<AcademicCalendarScreen> {
           const SizedBox(height: 16),
           _buildExamTimetableCard(),
           const SizedBox(height: 16),
+          _buildResitSupplementaryNoticeCard(),
+          const SizedBox(height: 16),
           ...events.map(
             (event) => _TimelineCard(
               title: event.title,
@@ -1467,6 +1469,153 @@ class _AcademicCalendarScreenState extends State<AcademicCalendarScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildResitSupplementaryNoticeCard() {
+    const schedule = <Map<String, String>>[
+      {
+        'date': 'Monday, 14 September 2026',
+        'courses': 'E-Commerce and E-Business; E-Commerce and Information Security; '
+            'Computerized Accounting; Company and Partnership Law II; French Language I; '
+            'Strategic Leadership; Marketing Research; Data Communication and Networking; '
+            'Financial Accounting II; Foundations of Computer Science; Introduction to General Psychology.',
+        'lecturers': 'Frank Adu; Ebenezer Sowah; Edmund Noye; Samuel Atakora; Dr. David Tawiah; '
+            'Samuel Ayeh-Bampoe; Samuel Ayeh-Bampoe; Ebenezer Sowah; Bill J. Appiah; '
+            'Gifty Okyere Anti; Dr. Evelyn Roberts',
+      },
+      {
+        'date': 'Tuesday, 15 September 2026',
+        'courses': 'Business Research Methods; Financial Reporting I; Accounting and Finance II; '
+            'Discrete and Continuous Mathematics; Introduction to Information Technology II; '
+            'Studies in African Development; Fundamentals of Entrepreneurial Management.',
+        'lecturers': 'Benjamin Zigbator; Samuel Oku Asamoah; Josephine Frimpong; Nathaniel Mensah; '
+            'Maame Baawa O. A.; Dr. Josiah Andor; Nana Yaw Boadi Appiah',
+      },
+      {
+        'date': 'Wednesday, 16 September 2026',
+        'courses': 'Introduction to Information Technology I; Performance Management; Advanced Accounting Practice; '
+            'Operations and Production Management; Personnel Systems and Procedures; International Marketing; '
+            'Management Control Systems.',
+        'lecturers': 'Maame Baawa O. A.; Eric Agyemang Badu; Eric Agyemang Badu; J. T. Tetteh Quaynor; '
+            'Dr. Freda Ocansey; Joseph Tetteh Quaynor; Rev. Snows Quarm',
+      },
+      {
+        'date': 'Thursday, 17 September 2026',
+        'courses': 'Financial Accounting I; Audit Assurance I; Government and Non-Profit Accounting; '
+            'Remuneration and Benefit Planning; Elements of Economics II; Database Management Systems; '
+            'Entrepreneurship and Innovation; Computer Organization.',
+        'lecturers': 'Bill J. Appiah; Samuel Oku Asamoah; Dr. James Nuamah; Samuel Oku Asamoah; '
+            'Dr. George Faah; Lenos Koku Ankrah; Nana Yaw Boadi Appiah; Stephen Asare',
+      },
+      {
+        'date': 'Friday, 18 September 2026',
+        'courses': 'Business and Corporate Strategy; Audit and Assurance II; Event Management; '
+            'Spreadsheet Modeling for Business Decision; General Principles of Business Law; '
+            'Introduction to Probability and Statistics; Taxation.',
+        'lecturers': 'Kwame Apau; Samuel Oko Asamoah; Kwame Apau; Maame Baawa O. A.; '
+            'Samuel Atakora; William Obeng Amponsah; Samuel Oku Asamoah',
+      },
+    ];
+    const rules = <String>[
+      'Settle all outstanding fees at the Accounts Office before entering the examination hall.',
+      'Be seated at least 30 minutes before the examination starts. No student will be admitted 30 minutes after commencement.',
+      'Present a valid Student ID Card. Contact Mr. Robert Aidoo immediately if a replacement is needed.',
+      'Mobile phones, smartwatches, tablets, PDAs and similar electronic devices are prohibited in the examination hall.',
+      'Bring all required stationery. Sharing or exchanging stationery is forbidden.',
+      'Sign in at the start of the examination and sign out when submitting your completed paper.',
+    ];
+
+    return Card(
+      elevation: 0,
+      color: Colors.red.withOpacity(0.06),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: Colors.red.withOpacity(0.18)),
+      ),
+      child: ExpansionTile(
+        leading: const Icon(Icons.assignment_late_rounded, color: Colors.redAccent),
+        title: const Text(
+          'Resit / supplementary examinations',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+        subtitle: const Text('14-18 September 2026 - 5:30 PM, Academic Block MPH, 3rd Floor'),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Notice from the Academic Office',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Dear Change Agent,\n\nPlease take note of the examination schedule and comply with the attached examination guidelines. Contact the Academic Office if you need clarification.\n\nAcademic Office',
+          ),
+          const SizedBox(height: 14),
+          ...schedule.map(
+            (entry) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(entry['date']!, style: const TextStyle(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 6),
+                    Text('Courses: ${entry['courses']}'),
+                    const SizedBox(height: 4),
+                    Text('Lecturers: ${entry['lecturers']}', style: TextStyle(color: Colors.grey.shade700)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Examination guidelines', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          ),
+          const SizedBox(height: 6),
+          ...rules.asMap().entries.map(
+                (entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${entry.key + 1}. ', style: const TextStyle(fontWeight: FontWeight.w800)),
+                      Expanded(child: Text(entry.value)),
+                    ],
+                  ),
+                ),
+              ),
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: _openResitTimetablePdf,
+            icon: const Icon(Icons.picture_as_pdf_rounded),
+            label: const Text('Open official timetable PDF'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openResitTimetablePdf() async {
+    final uri = Uri.base.resolve(
+      'assets/academic/resit_supplementary_exams_14_18_26.pdf',
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('The official timetable PDF could not be opened.')),
     );
   }
 
