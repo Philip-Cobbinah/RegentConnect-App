@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "provision:officer": "node provision_officer.mjs"
+    "provision:officer": "node provision_officer.mjs",
+    "provision:admin": "node set_admin_claim.mjs"
   },
   "dependencies": {
     "firebase-admin": "^13.4.0"

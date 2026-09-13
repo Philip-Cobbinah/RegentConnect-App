@@ -128,6 +128,33 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Admin-only data is isolated from user profiles and ordinary user flows.
+    // The admin role must be set as a Firebase Auth custom claim by a trusted
+    // server process; a client-editable users.role field is never sufficient.
+    match /admin_announcements/{announcementId} {
+      allow read: if signedIn();
+      allow create: if isAdmin() &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.title is string &&
+        request.resource.data.title.size() <= 120 &&
+        request.resource.data.body is string &&
+        request.resource.data.body.size() <= 4000 &&
+        request.resource.data.active is bool;
+      allow update: if isAdmin() &&
+        request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if isAdmin();
+    }
+
+    match /admin_audit_logs/{auditId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() &&
+        request.resource.data.actorUid == request.auth.uid &&
+        request.resource.data.action is string &&
+        request.resource.data.action.size() <= 120 &&
+        request.resource.data.targetId is string;
+      allow update, delete: if false;
+    }
+
     match /users/{userId} {
       allow read: if signedIn();
       allow create, update: if validOwnProfile(userId, request.resource.data);
